@@ -20,6 +20,7 @@
 package io.druid.server.coordination;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Ordering;
 import com.google.inject.Inject;
@@ -30,18 +31,7 @@ import com.metamx.emitter.service.ServiceEmitter;
 import com.metamx.emitter.service.ServiceMetricEvent;
 import io.druid.collections.CountingMap;
 import io.druid.guice.annotations.Processing;
-import io.druid.query.BySegmentQueryRunner;
-import io.druid.query.FinalizeResultsQueryRunner;
-import io.druid.query.MetricsEmittingQueryRunner;
-import io.druid.query.NoopQueryRunner;
-import io.druid.query.Query;
-import io.druid.query.QueryRunner;
-import io.druid.query.QueryRunnerFactory;
-import io.druid.query.QueryRunnerFactoryConglomerate;
-import io.druid.query.QuerySegmentWalker;
-import io.druid.query.QueryToolChest;
-import io.druid.query.ReferenceCountingSegmentQueryRunner;
-import io.druid.query.SegmentDescriptor;
+import io.druid.query.*;
 import io.druid.query.spec.QuerySegmentSpec;
 import io.druid.query.spec.SpecificSegmentQueryRunner;
 import io.druid.query.spec.SpecificSegmentSpec;
@@ -60,12 +50,13 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 /**
  */
-public class ServerManager implements QuerySegmentWalker
+public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
 {
   private static final EmittingLogger log = new EmittingLogger(ServerManager.class);
 
@@ -372,4 +363,27 @@ public class ServerManager implements QuerySegmentWalker
         segmentSpec
     );
   }
+
+  public Optional<Segment> findSegment(String dataSource, SegmentDescriptor spec) {
+      final VersionedIntervalTimeline<String, ReferenceCountingSegment> timeline = dataSources.get(dataSource);
+
+      if (timeline == null) {
+          return Optional.absent();
+      }
+      final PartitionHolder<ReferenceCountingSegment> entry = timeline.findEntry(
+              spec.getInterval(), spec.getVersion()
+      );
+
+      if (entry == null) {
+          return Optional.absent();
+      }
+      final PartitionChunk<ReferenceCountingSegment> chunk = entry.getChunk(spec.getPartitionNumber());
+      if (chunk == null) {
+          return Optional.absent();
+      }
+
+      final Segment adapter = chunk.getObject();
+      return Optional.of(adapter);
+  }
+
 }

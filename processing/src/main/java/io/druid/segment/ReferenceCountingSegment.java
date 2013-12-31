@@ -20,6 +20,7 @@
 package io.druid.segment;
 
 import com.metamx.emitter.EmittingLogger;
+import io.druid.query.SegmentDescriptor;
 import org.joda.time.Interval;
 
 import java.io.Closeable;
@@ -36,6 +37,7 @@ public class ReferenceCountingSegment implements Segment
 
   private volatile int numReferences = 0;
   private volatile boolean isClosed = false;
+  private SegmentDescriptor metadata;
 
   public ReferenceCountingSegment(Segment baseSegment)
   {
@@ -179,5 +181,13 @@ public class ReferenceCountingSegment implements Segment
       isClosed = true;
       baseSegment.close();
     }
+  }
+
+  public void setMetadata(SegmentDescriptor descriptor) {
+      this.metadata = descriptor;
+  }
+
+  public SegmentDescriptor getMetadata() {
+      return metadata;
   }
 }

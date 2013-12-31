@@ -37,9 +37,7 @@ import io.druid.guice.LazySingleton;
 import io.druid.guice.LifecycleModule;
 import io.druid.guice.ManageLifecycle;
 import io.druid.guice.annotations.Self;
-import io.druid.query.MapQueryToolChestWarehouse;
-import io.druid.query.QuerySegmentWalker;
-import io.druid.query.QueryToolChestWarehouse;
+import io.druid.query.*;
 import io.druid.server.ClientInfoResource;
 import io.druid.server.ClientQuerySegmentWalker;
 import io.druid.server.QueryResource;
@@ -84,6 +82,8 @@ public class CliBroker extends ServerRunnable
             binder.bind(QuerySegmentWalker.class).to(ClientQuerySegmentWalker.class).in(LazySingleton.class);
 
             binder.bind(JettyServerInitializer.class).to(QueryJettyServerInitializer.class).in(LazySingleton.class);
+            binder.bind(QuerySegmentFinder.class).to(NoopQuerySegmentFinder.class).in(LazySingleton.class);
+
             Jerseys.addResource(binder, QueryResource.class);
             Jerseys.addResource(binder, ClientInfoResource.class);
             LifecycleModule.register(binder, QueryResource.class);

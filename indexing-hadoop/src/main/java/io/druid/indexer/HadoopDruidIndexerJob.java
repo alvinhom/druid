@@ -72,19 +72,22 @@ public class HadoopDruidIndexerJob implements Jobby
 
     ensurePaths();
 
-    if (config.partitionByDimension()) {
-      jobs.add(new DeterminePartitionsJob(config));
-    }
-    else {
-      Map<DateTime, List<HadoopyShardSpec>> shardSpecs = Maps.newTreeMap(DateTimeComparator.getInstance());
-      int shardCount = 0;
-      for (Interval segmentGranularity : config.getSegmentGranularIntervals()) {
-        DateTime bucket = segmentGranularity.getStart();
-        final HadoopyShardSpec spec = new HadoopyShardSpec(new NoneShardSpec(), shardCount++);
-        shardSpecs.put(bucket, Lists.newArrayList(spec));
-        log.info("DateTime[%s], spec[%s]", bucket, spec);
-      }
-      config.setShardSpecs(shardSpecs);
+    if (config.getShardSpecs() == null || config.getShardSpecs().isEmpty()) {
+        if (config.partitionByDimension()) {
+          jobs.add(new DeterminePartitionsJob(config));
+        }
+        // check to see if shard spec is specified as part of input
+        else {
+          Map<DateTime, List<HadoopyShardSpec>> shardSpecs = Maps.newTreeMap(DateTimeComparator.getInstance());
+          int shardCount = 0;
+          for (Interval segmentGranularity : config.getSegmentGranularIntervals()) {
+            DateTime bucket = segmentGranularity.getStart();
+            final HadoopyShardSpec spec = new HadoopyShardSpec(new NoneShardSpec(), shardCount++);
+            shardSpecs.put(bucket, Lists.newArrayList(spec));
+            log.info("DateTime[%s], spec[%s]", bucket, spec);
+          }
+          config.setShardSpecs(shardSpecs);
+        }
     }
 
     indexJob = new IndexGeneratorJob(config);

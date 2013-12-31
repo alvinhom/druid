@@ -42,6 +42,8 @@ import io.druid.guice.LazySingleton;
 import io.druid.guice.LifecycleModule;
 import io.druid.guice.ManageLifecycle;
 import io.druid.guice.annotations.Self;
+import io.druid.query.NoopQuerySegmentFinder;
+import io.druid.query.QuerySegmentFinder;
 import io.druid.server.coordinator.DruidCoordinator;
 import io.druid.server.coordinator.DruidCoordinatorConfig;
 import io.druid.server.coordinator.LoadQueueTaskMaster;
@@ -104,6 +106,7 @@ public class CliCoordinator extends ServerRunnable
             binder.bind(RedirectInfo.class).to(CoordinatorRedirectInfo.class).in(LazySingleton.class);
 
             binder.bind(DruidCoordinator.class);
+            binder.bind(QuerySegmentFinder.class).to(NoopQuerySegmentFinder.class).in(LazySingleton.class);
 
             LifecycleModule.register(binder, DruidCoordinator.class);
             DiscoveryModule.register(binder, Self.class);

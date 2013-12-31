@@ -69,6 +69,7 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeComparator;
 import org.joda.time.Interval;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -241,6 +242,8 @@ public class DeterminePartitionsJob implements Jobby
           log.info("Path[%s] didn't exist!?", partitionInfoPath);
         }
       }
+      config.jsonMapper.writeValue(new File("/tmp/determine_partition.json"), shardSpecs);
+      log.info("Full Shard Spec: " + config.jsonMapper.writeValueAsString(shardSpecs));
       config.setShardSpecs(shardSpecs);
 
       return true;
@@ -326,7 +329,15 @@ public class DeterminePartitionsJob implements Jobby
     {
       final List<Object> timeAndDims = HadoopDruidIndexerConfig.jsonMapper.readValue(key.getBytes(), List.class);
 
-      final DateTime timestamp = new DateTime(timeAndDims.get(0));
+      //final DateTime timestamp = new DateTime(timeAndDims.get(0));
+      Object timeWrapper = timeAndDims.get(0);
+      // convert it to long if necessary
+              long time;
+      if (timeWrapper instanceof Integer)
+          time = ((Integer) timeWrapper).longValue();
+      else
+        time = (Long) timeWrapper;
+      final DateTime timestamp = new DateTime(time);
       final Map<String, Iterable<String>> dims = (Map<String, Iterable<String>>) timeAndDims.get(1);
 
       helper.emitDimValueCounts(context, timestamp, dims);

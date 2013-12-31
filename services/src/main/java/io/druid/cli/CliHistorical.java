@@ -29,6 +29,7 @@ import io.druid.guice.LazySingleton;
 import io.druid.guice.LifecycleModule;
 import io.druid.guice.ManageLifecycle;
 import io.druid.guice.NodeTypeConfig;
+import io.druid.query.QuerySegmentFinder;
 import io.druid.query.QuerySegmentWalker;
 import io.druid.server.QueryResource;
 import io.druid.server.coordination.ServerManager;
@@ -64,7 +65,8 @@ public class CliHistorical extends ServerRunnable
           {
             binder.bind(ServerManager.class).in(LazySingleton.class);
             binder.bind(ZkCoordinator.class).in(ManageLifecycle.class);
-            binder.bind(QuerySegmentWalker.class).to(ServerManager.class).in(LazySingleton.class);
+            binder.bind(QuerySegmentWalker.class).to(ServerManager.class);
+            binder.bind(QuerySegmentFinder.class).to(ServerManager.class);
 
             binder.bind(NodeTypeConfig.class).toInstance(new NodeTypeConfig("historical"));
             binder.bind(JettyServerInitializer.class).to(QueryJettyServerInitializer.class).in(LazySingleton.class);
