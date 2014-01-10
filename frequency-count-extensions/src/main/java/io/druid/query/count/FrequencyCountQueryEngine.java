@@ -3,6 +3,8 @@ package io.druid.query.count;
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.inject.Inject;
+import com.metamx.common.guava.BaseSequence;
+import com.metamx.common.guava.Sequence;
 import com.metamx.common.ISE;
 import io.druid.query.QuerySegmentFinder;
 import io.druid.query.SegmentDescriptor;
@@ -12,7 +14,9 @@ import io.druid.query.search.search.SearchQuerySpec;
 import io.druid.segment.*;
 import io.druid.segment.filter.Filters;
 import it.uniroma3.mat.extendedset.intset.ImmutableConciseSet;
+import io.druid.query.Result;
 
+import java.util.Iterator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,13 +41,13 @@ public class FrequencyCountQueryEngine {
         this.finder = finder;
     }
 
-    public Iterable<FrequencyCountResult> process(final FrequencyCountQuery query, final Segment segment, final Filter filter)
+    public Sequence<Result<FrequencyCountResult>> process(final FrequencyCountQuery query, final Segment segment, final Filter filter)
     {
         final QueryableIndex index =  segment.asQueryableIndex();
         final QueryableIndexStorageAdapter adapter = new QueryableIndexStorageAdapter(index);
         final List<String> dimensions = query.getDimensions();
 
-        final List<FrequencyCountResult> retVal = Lists.newArrayList();
+        final List<Result<FrequencyCountResult>> retVal = Lists.newArrayList();
 
         SearchQuerySpec searchQuerySpec = query.getQuery();
 
@@ -82,7 +86,7 @@ public class FrequencyCountQueryEngine {
                 } else {
                     dimensionMap.put("total", selector.getNumRows());
                 }
-                retVal.add(new FrequencyCountResult("count", Lists.newArrayList(adapter.getInterval()), dimensionMap));
+                retVal.add(new Result(segment.getDataInterval().getStart(), new FrequencyCountResult("count", Lists.newArrayList(adapter.getInterval()), dimensionMap)));
             } else {
                 for (String dimension : dimensions) {
                     Map<String, Integer> dimensionMap = new HashMap<String, Integer>();
@@ -106,11 +110,27 @@ public class FrequencyCountQueryEngine {
                                 }
                             }
                         }
-                        retVal.add(new FrequencyCountResult(dimension, Lists.newArrayList(adapter.getInterval()), dimensionMap));
+                        retVal.add(new Result(segment.getDataInterval().getStart(),new FrequencyCountResult(dimension, Lists.newArrayList(adapter.getInterval()), dimensionMap)));
                     }
                 }
             }
         }
-        return retVal;
+          return new BaseSequence<Result<FrequencyCountResult>, Iterator<Result<FrequencyCountResult>>>(
+              new BaseSequence.IteratorMaker<Result<FrequencyCountResult>, Iterator<Result<FrequencyCountResult>>>()
+              {
+                  @Override
+                  public Iterator<Result<FrequencyCountResult>> make()
+                  {
+                    return
+                       retVal.iterator();
+                  }
+
+                  @Override
+                  public void cleanup(Iterator<Result<FrequencyCountResult>> toClean)
+                  {
+
+                  }
+              }
+          );
     }
 }

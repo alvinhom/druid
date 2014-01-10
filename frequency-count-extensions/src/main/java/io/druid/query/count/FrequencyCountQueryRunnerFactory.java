@@ -40,7 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
-public class FrequencyCountQueryRunnerFactory implements QueryRunnerFactory<FrequencyCountResult, FrequencyCountQuery>
+public class FrequencyCountQueryRunnerFactory implements QueryRunnerFactory<Result<FrequencyCountResult>, FrequencyCountQuery>
 {
 
   // private static final FrequencyCountQueryQueryToolChest toolChest = new FrequencyCountQueryQueryToolChest();
@@ -58,36 +58,36 @@ public class FrequencyCountQueryRunnerFactory implements QueryRunnerFactory<Freq
   }
 
   @Override
-  public QueryRunner<FrequencyCountResult> createRunner(final Segment segment)
+  public QueryRunner<Result<FrequencyCountResult>> createRunner(final Segment segment)
   {
     return new FrequencyCountQueryRunner(segment, engine);
   }
 
   @Override
-  public QueryRunner<FrequencyCountResult> mergeRunners(
-      final ExecutorService queryExecutor, Iterable<QueryRunner<FrequencyCountResult>> queryRunners
+  public QueryRunner<Result<FrequencyCountResult>> mergeRunners(
+      final ExecutorService queryExecutor, Iterable<QueryRunner<Result<FrequencyCountResult>>> queryRunners
   )
   {
-    return new ChainedExecutionQueryRunner<FrequencyCountResult>(queryExecutor, new CountOrdering(), queryRunners);
+    return new ChainedExecutionQueryRunner<Result<FrequencyCountResult>>(queryExecutor, toolChest.getOrdering(), queryRunners);
   }
 
   @Override
-  public QueryToolChest<FrequencyCountResult, FrequencyCountQuery> getToolchest()
+  public QueryToolChest<Result<FrequencyCountResult>, FrequencyCountQuery> getToolchest()
   {
     return toolChest;
   }
 
-    private static class CountOrdering extends Ordering<FrequencyCountResult>
-    {
-        @Override
-        public int compare(FrequencyCountResult left, FrequencyCountResult right)
-        {
-            // order does not matter
-            return 1;
-        }
-    }
+  private static class CountOrdering extends Ordering<Result<FrequencyCountResult>>
+  {
+      @Override
+      public int compare(Result<FrequencyCountResult> left, Result<FrequencyCountResult> right)
+      {
+          // order does not matter
+          return 1;
+      }
+  }
 
-  private static class FrequencyCountQueryRunner implements QueryRunner<FrequencyCountResult>
+  private static class FrequencyCountQueryRunner implements QueryRunner<Result<FrequencyCountResult>>
   {
       private final Segment segment;
       private final FrequencyCountQueryEngine engine;
@@ -98,31 +98,14 @@ public class FrequencyCountQueryRunnerFactory implements QueryRunnerFactory<Freq
       }
 
       @Override
-      public Sequence<FrequencyCountResult> run (final Query<FrequencyCountResult> input)
+      public Sequence<Result<FrequencyCountResult>> run (final Query<Result<FrequencyCountResult>> input)
       {
           if (!(input instanceof FrequencyCountQuery)) {
               throw new ISE("Got a [%s] which isin't a %s", input.getClass(), FrequencyCountQuery.class);
           }
 
           final FrequencyCountQuery query = (FrequencyCountQuery) input;
-
-          return new BaseSequence<FrequencyCountResult, Iterator<FrequencyCountResult>>(
-              new BaseSequence.IteratorMaker<FrequencyCountResult, Iterator<FrequencyCountResult>>()
-              {
-                  @Override
-                  public Iterator<FrequencyCountResult> make()
-                  {
-                    return
-                       engine.process(query, segment, Filters.convertDimensionFilters(query.getDimensionsFilter())).iterator();
-                  }
-
-                  @Override
-                  public void cleanup(Iterator<FrequencyCountResult> toClean)
-                  {
-
-                  }
-              }
-          );
+          return engine.process(query, segment, Filters.convertDimensionFilters(query.getDimensionsFilter()));
 
       }
 

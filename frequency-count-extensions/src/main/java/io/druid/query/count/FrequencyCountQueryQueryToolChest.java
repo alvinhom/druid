@@ -35,7 +35,9 @@ import io.druid.collections.OrderedMergeSequence;
 import io.druid.query.Query;
 import io.druid.query.QueryRunner;
 import io.druid.query.QueryToolChest;
+import io.druid.query.ResultGranularTimestampComparator;
 import io.druid.query.ResultMergeQueryRunner;
+import io.druid.query.Result;
 import io.druid.query.aggregation.MetricManipulationFn;
 import org.joda.time.Interval;
 import org.joda.time.Minutes;
@@ -46,41 +48,37 @@ import java.util.Map;
 import java.util.Set;
 
 
-public class FrequencyCountQueryQueryToolChest extends QueryToolChest<FrequencyCountResult, FrequencyCountQuery>
+public class FrequencyCountQueryQueryToolChest extends QueryToolChest<Result<FrequencyCountResult>, FrequencyCountQuery>
 {
-  private static final TypeReference<FrequencyCountResult> TYPE_REFERENCE = new TypeReference<FrequencyCountResult>(){};
+  private static final TypeReference<Result<FrequencyCountResult>> TYPE_REFERENCE = new TypeReference<Result<FrequencyCountResult>>(){};
 
   @Override
-  public QueryRunner<FrequencyCountResult> mergeResults(final QueryRunner<FrequencyCountResult> runner)
+  public QueryRunner<Result<FrequencyCountResult>> mergeResults(final QueryRunner<Result<FrequencyCountResult>> runner)
   {
-    return new ResultMergeQueryRunner<FrequencyCountResult>(runner)
+    return new ResultMergeQueryRunner<Result<FrequencyCountResult>>(runner)
     {
       @Override
-      protected Ordering<FrequencyCountResult> makeOrdering(Query<FrequencyCountResult> query)
+      protected Ordering<Result<FrequencyCountResult>> makeOrdering(Query<Result<FrequencyCountResult>> query)
       {
-          // Merge everything always
-          return new Ordering<FrequencyCountResult>()
-          {
-            @Override
-            public int compare(
-                @Nullable FrequencyCountResult left, @Nullable FrequencyCountResult right
+        return getOrdering();
+        /* TODO not sure above works
+        return Ordering.from(
+            new ResultGranularTimestampComparator<FrequencyCountResult>(
+                ((FrequencyCountQuery) query).getGranularity()
             )
-            {
-              return 0;
-            }
-          };
-
+        );
+        */
       }
 
       @Override
-      protected BinaryFn<FrequencyCountResult, FrequencyCountResult, FrequencyCountResult> createMergeFn(final Query<FrequencyCountResult> inQ)
+      protected BinaryFn<Result<FrequencyCountResult>, Result<FrequencyCountResult>, Result<FrequencyCountResult>> createMergeFn(final Query<Result<FrequencyCountResult>> inQ)
       {
-        return new BinaryFn<FrequencyCountResult, FrequencyCountResult, FrequencyCountResult>()
+        return new BinaryFn<Result<FrequencyCountResult>, Result<FrequencyCountResult>, Result<FrequencyCountResult>>()
         {
           private final FrequencyCountQuery query = (FrequencyCountQuery) inQ;
 
           @Override
-          public FrequencyCountResult apply(FrequencyCountResult arg1, FrequencyCountResult arg2)
+          public Result<FrequencyCountResult> apply(Result<FrequencyCountResult> arg1, Result<FrequencyCountResult> arg2)
           {
             if (arg1 == null) {
               return arg2;
@@ -90,6 +88,9 @@ public class FrequencyCountQueryQueryToolChest extends QueryToolChest<FrequencyC
               return arg1;
             }
 
+            FrequencyCountResult arg1Val = arg1.getValue();
+            FrequencyCountResult arg2Val = arg2.getValue();
+
             /*  TODO doublecheck the merge
             if (!query.isMerge()) {
               throw new ISE("Merging when a merge isn't supposed to happen[%s], [%s]", arg1, arg2);
@@ -97,11 +98,11 @@ public class FrequencyCountQueryQueryToolChest extends QueryToolChest<FrequencyC
             */
 
             List<Interval> newIntervals = JodaUtils.condenseIntervals(
-                    Iterables.concat(arg1.getIntervals(), arg2.getIntervals())
+                    Iterables.concat(arg1Val.getIntervals(), arg2Val.getIntervals())
             );
 
-            final Map<String, Integer> leftColumns = arg1.getDimensionCounts();
-            final Map<String, Integer> rightColumns = arg2.getDimensionCounts();
+            final Map<String, Integer> leftColumns = arg1Val.getDimensionCounts();
+            final Map<String, Integer> rightColumns = arg2Val.getDimensionCounts();
             Map<String, Integer> columns = Maps.newTreeMap();
 
             Set<String> rightColumnNames = Sets.newHashSet(rightColumns.keySet());
@@ -117,7 +118,7 @@ public class FrequencyCountQueryQueryToolChest extends QueryToolChest<FrequencyC
               columns.put(columnName, rightColumns.get(columnName));
             }
 
-            return new FrequencyCountResult("merged", newIntervals, columns);
+            return new Result<FrequencyCountResult>(arg1.getTimestamp(), new FrequencyCountResult("merged", newIntervals, columns));
           }
         };
       }
@@ -125,9 +126,9 @@ public class FrequencyCountQueryQueryToolChest extends QueryToolChest<FrequencyC
   }
 
   @Override
-  public Sequence<FrequencyCountResult> mergeSequences(Sequence<Sequence<FrequencyCountResult>> seqOfSequences)
+  public Sequence<Result<FrequencyCountResult>> mergeSequences(Sequence<Sequence<Result<FrequencyCountResult>>> seqOfSequences)
   {
-    return new OrderedMergeSequence<FrequencyCountResult>(getOrdering(), seqOfSequences);
+    return new OrderedMergeSequence<Result<FrequencyCountResult>>(getOrdering(), seqOfSequences);
   }
 
   @Override
@@ -143,11 +144,12 @@ public class FrequencyCountQueryQueryToolChest extends QueryToolChest<FrequencyC
         .setUser4(query.getType())
         .setUser5(Joiner.on(",").join(query.getIntervals()))
         .setUser6(String.valueOf(query.hasFilters()))
+        .setUser7(String.valueOf(query.hasFilters()))
         .setUser9(Minutes.minutes(numMinutes).toString());
   }
 
   @Override
-  public Function<FrequencyCountResult, FrequencyCountResult> makeMetricManipulatorFn(
+  public Function<Result<FrequencyCountResult>, Result<FrequencyCountResult>> makeMetricManipulatorFn(
       FrequencyCountQuery query, MetricManipulationFn fn
   )
   {
@@ -155,20 +157,13 @@ public class FrequencyCountQueryQueryToolChest extends QueryToolChest<FrequencyC
   }
 
   @Override
-  public TypeReference<FrequencyCountResult> getResultTypeReference()
+  public TypeReference<Result<FrequencyCountResult>> getResultTypeReference()
   {
     return TYPE_REFERENCE;
   }
 
-  private Ordering<FrequencyCountResult> getOrdering()
+  public Ordering<Result<FrequencyCountResult>> getOrdering()
   {
-    return new Ordering<FrequencyCountResult>()
-    {
-      @Override
-      public int compare(FrequencyCountResult left, FrequencyCountResult right)
-      {
-        return left.getDimension().compareTo(right.getDimension());
-      }
-    };
+    return Ordering.natural();
   }
 }

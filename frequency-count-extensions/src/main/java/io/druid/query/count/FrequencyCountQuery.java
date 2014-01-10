@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 
 import io.druid.query.BaseQuery;
+import io.druid.query.Result;
 import io.druid.query.filter.DimFilter;
 import io.druid.query.search.search.SearchQuerySpec;
 import io.druid.query.spec.QuerySegmentSpec;
@@ -35,7 +36,7 @@ import java.util.Map;
 /**
  */
 @JsonTypeName("frequencyCount")
-public class FrequencyCountQuery extends BaseQuery<FrequencyCountResult>
+public class FrequencyCountQuery extends BaseQuery<Result<FrequencyCountResult>>
 {
   public static final String FREQUENCYCOUNT = "frequencyCount";
 
