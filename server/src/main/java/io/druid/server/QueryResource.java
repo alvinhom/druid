@@ -87,6 +87,8 @@ public class QueryResource
       @Context HttpServletResponse resp
   ) throws ServletException, IOException
   {
+    final long start = System.currentTimeMillis();
+
     Query query = null;
     byte[] requestQuery = null;
 
@@ -118,7 +120,7 @@ public class QueryResource
       out = resp.getOutputStream();
       jsonWriter.writeValue(out, results);
 
-      long requestTime = System.currentTimeMillis() - req.getSession().getCreationTime();
+      long requestTime = System.currentTimeMillis() - start;
 
       emitter.emit(
           new ServiceMetricEvent.Builder()
@@ -126,6 +128,7 @@ public class QueryResource
               .setUser4(query.getType())
               .setUser5(query.getIntervals().get(0).toString())
               .setUser6(String.valueOf(query.hasFilters()))
+              .setUser7(req.getRemoteAddr())
               .setUser9(query.getDuration().toPeriod().toStandardMinutes().toString())
               .build("request/time", requestTime)
       );

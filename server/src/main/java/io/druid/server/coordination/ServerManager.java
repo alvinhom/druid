@@ -107,7 +107,13 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
     return segmentLoader.isSegmentLoaded(segment);
   }
 
-  public void loadSegment(final DataSegment segment) throws SegmentLoadingException
+  /**
+   * Load a single segment.
+   * @param segment segment to load
+   * @return true if the segment was newly loaded, false if it was already loaded
+   * @throws SegmentLoadingException if the segment cannot be loaded
+   */
+  public boolean loadSegment(final DataSegment segment) throws SegmentLoadingException
   {
     final Segment adapter;
     try {
@@ -141,8 +147,8 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
           segment.getVersion()
       );
       if ((entry != null) && (entry.getChunk(segment.getShardSpec().getPartitionNum()) != null)) {
-        log.info("Told to load a adapter for a segment[%s] that already exists", segment.getIdentifier());
-        throw new SegmentLoadingException("Segment already exists[%s]", segment.getIdentifier());
+        log.warn("Told to load a adapter for a segment[%s] that already exists", segment.getIdentifier());
+        return false;
       }
 
       loadedIntervals.add(
@@ -156,6 +162,7 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
       synchronized (dataSourceCounts) {
         dataSourceCounts.add(dataSource, 1L);
       }
+      return true;
     }
   }
 
