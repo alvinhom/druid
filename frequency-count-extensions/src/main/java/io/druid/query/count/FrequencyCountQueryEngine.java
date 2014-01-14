@@ -86,7 +86,8 @@ public class FrequencyCountQueryEngine {
                 } else {
                     dimensionMap.put("total", selector.getNumRows());
                 }
-                retVal.add(new Result(segment.getDataInterval().getStart(), new FrequencyCountResult("count", Lists.newArrayList(adapter.getInterval()), dimensionMap)));
+                //retVal.add(new Result(segment.getDataInterval().getStart(), new FrequencyCountResult("count", Lists.newArrayList(adapter.getInterval()), dimensionMap)));
+                retVal.add(new Result(segment.getDataInterval().getStart(), new FrequencyCountResult("count", dimensionMap)));
             } else {
                 for (String dimension : dimensions) {
                     Map<String, Integer> dimensionMap = new HashMap<String, Integer>();
@@ -110,7 +111,7 @@ public class FrequencyCountQueryEngine {
                                 }
                             }
                         }
-                        retVal.add(new Result(segment.getDataInterval().getStart(),new FrequencyCountResult(dimension, Lists.newArrayList(adapter.getInterval()), dimensionMap)));
+                        retVal.add(new Result(segment.getDataInterval().getStart(),new FrequencyCountResult(dimension, dimensionMap)));
                     }
                 }
             }

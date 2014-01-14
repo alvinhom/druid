@@ -9,6 +9,7 @@ package io.druid.query.count;
  */
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.metamx.common.guava.Sequences;
 import io.druid.granularity.QueryGranularity;
@@ -26,6 +27,7 @@ import org.junit.runners.Parameterized;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
 /**
  */
@@ -50,10 +52,10 @@ public class FrequencyCountQueryRunnerTest
 
 
         return Arrays.asList(
-                new Object[][]{
+                new Object[][]{/*
                         {
                                 makeQueryRunner(factory, rtSegment, new SegmentDescriptor(DATA_INTERVAL, "one", 1))
-                        },
+                        },*/
                         {
                                 makeQueryRunner(factory, mMappedSegment, new SegmentDescriptor(DATA_INTERVAL, "two", 2))
                         },
@@ -123,23 +125,20 @@ public class FrequencyCountQueryRunnerTest
         DateTime expectedEarliest = new DateTime("2011-01-12");
         DateTime expectedLast = new DateTime("2011-04-15");
 
-        Iterable<FrequencyCountResult> results = Sequences.toList(
+        Iterable<Result<FrequencyCountResult>> results = Sequences.toList(
                 runner.run(query),
-                Lists.<FrequencyCountResult>newArrayList()
+                Lists.<Result<FrequencyCountResult>>newArrayList()
         );
 
-        int count = 0;
-        FrequencyCountResult lastResult = null;
-        for (FrequencyCountResult result : results) {
-            lastResult = result;
-
-            System.out.println(result);
-
-            expectedEarliest = gran.toDateTime(gran.next(expectedEarliest.getMillis()));
-            ++count;
-        }
-
-        // Assert.assertEquals(lastResult.toString(), expectedLast, lastResult.getTimestamp());
+        List<Result<FrequencyCountResult>> expectedResults = Arrays.asList(
+                new Result<FrequencyCountResult>(
+                        new DateTime("2011-01-12"),
+                        new FrequencyCountResult("quality",
+                                createMapOf("automotive", 0, "technology", 0, "mezzanine", 93, "news", 0, "premium", 93, "travel", 0, "health", 0, "entertainment", 0, "business", 0)
+                        )
+                )
+        );
+        TestHelper.assertExpectedResults(expectedResults, results);
     }
 
     @Test
@@ -156,23 +155,22 @@ public class FrequencyCountQueryRunnerTest
         DateTime expectedEarliest = new DateTime("2011-01-12");
         DateTime expectedLast = new DateTime("2011-04-15");
 
-        Iterable<FrequencyCountResult> results = Sequences.toList(
+        Iterable<Result<FrequencyCountResult>> results = Sequences.toList(
                 runner.run(query),
-                Lists.<FrequencyCountResult>newArrayList()
+                Lists.<Result<FrequencyCountResult>>newArrayList()
         );
 
         int count = 0;
-        FrequencyCountResult lastResult = null;
-        for (FrequencyCountResult result : results) {
-            lastResult = result;
-
-            System.out.println(result);
-
-            expectedEarliest = gran.toDateTime(gran.next(expectedEarliest.getMillis()));
-            ++count;
-        }
-
-        // Assert.assertEquals(lastResult.toString(), expectedLast, lastResult.getTimestamp());
+        Result<FrequencyCountResult> lastResult = null;
+        List<Result<FrequencyCountResult>> expectedResults = Arrays.asList(
+                new Result<FrequencyCountResult>(
+                        new DateTime("2011-01-12"),
+                        new FrequencyCountResult("quality",
+                                createMapOf("automotive", 93, "technology", 93, "mezzanine", 279, "news", 93, "premium", 279, "travel", 93, "health", 93, "entertainment", 93, "business", 93)
+                        )
+                )
+        );
+        TestHelper.assertExpectedResults(expectedResults, results);
     }
 
     @Test
@@ -191,23 +189,20 @@ public class FrequencyCountQueryRunnerTest
         DateTime expectedEarliest = new DateTime("2011-01-12");
         DateTime expectedLast = new DateTime("2011-04-15");
 
-        Iterable<FrequencyCountResult> results = Sequences.toList(
+        Iterable<Result<FrequencyCountResult>> results = Sequences.toList(
                 runner.run(query),
-                Lists.<FrequencyCountResult>newArrayList()
+                Lists.<Result<FrequencyCountResult>>newArrayList()
         );
 
-        int count = 0;
-        FrequencyCountResult lastResult = null;
-        for (FrequencyCountResult result : results) {
-            lastResult = result;
-
-            System.out.println(result);
-
-            expectedEarliest = gran.toDateTime(gran.next(expectedEarliest.getMillis()));
-            ++count;
-        }
-
-        // Assert.assertEquals(lastResult.toString(), expectedLast, lastResult.getTimestamp());
+        List<Result<FrequencyCountResult>> expectedResults = Arrays.asList(
+                new Result<FrequencyCountResult>(
+                        new DateTime("2011-01-12"),
+                        new FrequencyCountResult("quality",
+                                ImmutableMap.of("premium", 93, "travel", 0)
+                        )
+                )
+        );
+        TestHelper.assertExpectedResults(expectedResults, results);
     }
 
     @Test
@@ -224,23 +219,20 @@ public class FrequencyCountQueryRunnerTest
         DateTime expectedEarliest = new DateTime("2011-01-12");
         DateTime expectedLast = new DateTime("2011-04-15");
 
-        Iterable<FrequencyCountResult> results = Sequences.toList(
+        Iterable<Result<FrequencyCountResult>> results = Sequences.toList(
                 runner.run(query),
-                Lists.<FrequencyCountResult>newArrayList()
+                Lists.<Result<FrequencyCountResult>>newArrayList()
         );
 
-        int count = 0;
-        FrequencyCountResult lastResult = null;
-        for (FrequencyCountResult result : results) {
-            lastResult = result;
-
-            System.out.println(result);
-
-            expectedEarliest = gran.toDateTime(gran.next(expectedEarliest.getMillis()));
-            ++count;
-        }
-
-        // Assert.assertEquals(lastResult.toString(), expectedLast, lastResult.getTimestamp());
+        List<Result<FrequencyCountResult>> expectedResults = Arrays.asList(
+                new Result<FrequencyCountResult>(
+                        new DateTime("2011-01-12"),
+                        new FrequencyCountResult("count",
+                                ImmutableMap.of("total", 186)
+                        )
+                )
+        );
+        TestHelper.assertExpectedResults(expectedResults, results);
     }
 
     @Test
@@ -257,23 +249,20 @@ public class FrequencyCountQueryRunnerTest
         DateTime expectedEarliest = new DateTime("2011-01-12");
         DateTime expectedLast = new DateTime("2011-04-15");
 
-        Iterable<FrequencyCountResult> results = Sequences.toList(
+        Iterable<Result<FrequencyCountResult>> results = Sequences.toList(
                 runner.run(query),
-                Lists.<FrequencyCountResult>newArrayList()
+                Lists.<Result<FrequencyCountResult>>newArrayList()
         );
 
-        int count = 0;
-        FrequencyCountResult lastResult = null;
-        for (FrequencyCountResult result : results) {
-            lastResult = result;
-
-            System.out.println(result);
-
-            expectedEarliest = gran.toDateTime(gran.next(expectedEarliest.getMillis()));
-            ++count;
-        }
-
-        // Assert.assertEquals(lastResult.toString(), expectedLast, lastResult.getTimestamp());
+        List<Result<FrequencyCountResult>> expectedResults = Arrays.asList(
+                new Result<FrequencyCountResult>(
+                        new DateTime("2011-01-12"),
+                        new FrequencyCountResult("count",
+                                ImmutableMap.of("total", 1209)
+                        )
+                )
+        );
+        TestHelper.assertExpectedResults(expectedResults, results);
     }
 
     @Test
@@ -291,23 +280,45 @@ public class FrequencyCountQueryRunnerTest
         DateTime expectedEarliest = new DateTime("2011-01-12");
         DateTime expectedLast = new DateTime("2011-04-15");
 
-        Iterable<FrequencyCountResult> results = Sequences.toList(
+        Iterable<Result<FrequencyCountResult>> results = Sequences.toList(
                 runner.run(query),
-                Lists.<FrequencyCountResult>newArrayList()
+                Lists.<Result<FrequencyCountResult>>newArrayList()
         );
-
+        /*
         int count = 0;
-        FrequencyCountResult lastResult = null;
-        for (FrequencyCountResult result : results) {
+        Result<FrequencyCountResult> lastResult = null;
+        for (Result<FrequencyCountResult> result : results) {
             lastResult = result;
 
             System.out.println(result);
 
             expectedEarliest = gran.toDateTime(gran.next(expectedEarliest.getMillis()));
             ++count;
-        }
+        }*/
+        List<Result<FrequencyCountResult>> expectedResults = Arrays.asList(
+                new Result<FrequencyCountResult>(
+                        new DateTime("2011-01-12"),
+                        new FrequencyCountResult("count",
+                                ImmutableMap.of("total", 93)
+                        )
+                )
+        );
+        TestHelper.assertExpectedResults(expectedResults, results);
+    }
 
-        // Assert.assertEquals(lastResult.toString(), expectedLast, lastResult.getTimestamp());
+
+    static <K, V> ImmutableMap<K, V> createMapOf(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6, K k7, V v7, K k8, V v8, K k9, V v9) {
+        return  new ImmutableMap.Builder<K, V>()
+                .put(k1, v1)
+                .put(k2, v2)
+                .put(k3, v3)
+                .put(k4, v4)
+                .put(k5, v5)
+                .put(k6, v6)
+                .put(k7, v7)
+                .put(k8, v8)
+                .put(k9, v9)
+                .build();
     }
 }
 

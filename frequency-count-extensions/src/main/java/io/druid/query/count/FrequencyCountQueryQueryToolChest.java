@@ -97,9 +97,11 @@ public class FrequencyCountQueryQueryToolChest extends QueryToolChest<Result<Fre
             }
             */
 
+            /*
             List<Interval> newIntervals = JodaUtils.condenseIntervals(
                     Iterables.concat(arg1Val.getIntervals(), arg2Val.getIntervals())
             );
+            */
 
             final Map<String, Integer> leftColumns = arg1Val.getDimensionCounts();
             final Map<String, Integer> rightColumns = arg2Val.getDimensionCounts();
@@ -118,7 +120,7 @@ public class FrequencyCountQueryQueryToolChest extends QueryToolChest<Result<Fre
               columns.put(columnName, rightColumns.get(columnName));
             }
 
-            return new Result<FrequencyCountResult>(arg1.getTimestamp(), new FrequencyCountResult("merged", newIntervals, columns));
+            return new Result<FrequencyCountResult>(arg1.getTimestamp(), new FrequencyCountResult("merged", columns));
           }
         };
       }

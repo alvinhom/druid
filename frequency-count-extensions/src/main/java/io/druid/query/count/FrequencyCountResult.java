@@ -31,19 +31,16 @@ import java.util.Map;
 public class FrequencyCountResult
 {
   private final String dimension;
-  private final List<Interval> interval;
   private final Map<String, Integer> dimensionCounts;
 
   @JsonCreator
   public FrequencyCountResult(
           @JsonProperty("dimension") String dimension,
-          @JsonProperty("intervals") List<Interval> interval,
           @JsonProperty("dimensionCounts") Map<String, Integer> dimensionCounts
 
   )
   {
     this.dimension = dimension;
-    this.interval = interval;
     this.dimensionCounts = dimensionCounts;
   }
 
@@ -53,15 +50,13 @@ public class FrequencyCountResult
     return dimension;
   }
 
-  @JsonProperty
-  public List<Interval> getIntervals()
-  {
-    return interval;
-  }
 
-  @JsonProperty
+
+
+    @JsonProperty
   public Map<String, Integer> getDimensionCounts()
   {
+
     return dimensionCounts;
   }
 
@@ -70,7 +65,6 @@ public class FrequencyCountResult
   {
     return "FrequencyCountResult{" +
            "dimension='" + dimension + '\'' +
-           ", interval=" + interval +
            ", dimensionCounts=" + dimensionCounts +
            '}';
   }
@@ -80,8 +74,27 @@ public class FrequencyCountResult
   {
     return "FrequencyCountResult{" +
            "dimension='" + dimension + '\'' +
-           ", interval=" + interval +
             ", dimensionCounts=" + dimensionCounts +
            '}';
   }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof FrequencyCountResult)) return false;
+
+        FrequencyCountResult that = (FrequencyCountResult) o;
+
+        if (!dimension.equals(that.dimension)) return false;
+        if (!dimensionCounts.equals(that.dimensionCounts)) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = dimension.hashCode();
+        result = 31 * result + dimensionCounts.hashCode();
+        return result;
+    }
 }
