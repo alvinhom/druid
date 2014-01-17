@@ -151,10 +151,13 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
         return false;
       }
 
+      SegmentDescriptor segmentDescriptor = new SegmentDescriptor(segment.getInterval(), segment.getVersion(),segment.getShardSpec().getPartitionNum());
+      ReferenceCountingSegment referenceCountingSegment = new ReferenceCountingSegment(adapter);
+      referenceCountingSegment.setMetadata(segmentDescriptor);
       loadedIntervals.add(
           segment.getInterval(),
           segment.getVersion(),
-          segment.getShardSpec().createChunk(new ReferenceCountingSegment(adapter))
+          segment.getShardSpec().createChunk(referenceCountingSegment)
       );
       synchronized (dataSourceSizes) {
         dataSourceSizes.add(dataSource, segment.getSize());
@@ -374,23 +377,24 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
   public Optional<Segment> findSegment(String dataSource, SegmentDescriptor spec) {
       final VersionedIntervalTimeline<String, ReferenceCountingSegment> timeline = dataSources.get(dataSource);
 
-      if (timeline == null) {
-          return Optional.absent();
+      if (timeline != null) {
+          final List<TimelineObjectHolder<String, ReferenceCountingSegment>> versionSegments = timeline.lookup(
+                  spec.getInterval()
+          );
+          if (versionSegments != null && !versionSegments.isEmpty()) {
+              // get the last version
+              TimelineObjectHolder<String, ReferenceCountingSegment> holder = versionSegments.get(versionSegments.size() - 1);
+              if (holder != null) {
+                  PartitionHolder<ReferenceCountingSegment> entry =  holder.getObject();
+                  final PartitionChunk<ReferenceCountingSegment> chunk = entry.getChunk(spec.getPartitionNumber());
+                  if (chunk != null) {
+                      final Segment adapter = chunk.getObject();
+                      return Optional.of(adapter);
+                  }
+              }
+          }
       }
-      final PartitionHolder<ReferenceCountingSegment> entry = timeline.findEntry(
-              spec.getInterval(), spec.getVersion()
-      );
-
-      if (entry == null) {
-          return Optional.absent();
-      }
-      final PartitionChunk<ReferenceCountingSegment> chunk = entry.getChunk(spec.getPartitionNumber());
-      if (chunk == null) {
-          return Optional.absent();
-      }
-
-      final Segment adapter = chunk.getObject();
-      return Optional.of(adapter);
+      return Optional.absent();
   }
 
 }

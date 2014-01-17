@@ -20,7 +20,7 @@ import io.druid.query.filter.DimFilter;
 })
 public interface JoinSpec
 {
-    public String getDatasource();
+    public String getDataSource();
     public DimFilter getFilter();
     public byte[] getCacheKey();
 }

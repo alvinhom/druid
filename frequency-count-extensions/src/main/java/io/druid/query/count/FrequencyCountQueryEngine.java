@@ -64,14 +64,18 @@ public class FrequencyCountQueryEngine {
                     SegmentDescriptor descriptor = ((ReferenceCountingSegment) segment).getMetadata();
                     if (descriptor != null) {
                         for (JoinSpec aJoin: joinSpecs) {
-                            Optional<Segment> joinSegment = finder.findSegment(aJoin.getDatasource(), descriptor);
-                            Segment otherSegment = joinSegment.get();
-                            BitmapIndexSelector joinSelector = new ColumnSelectorBitmapIndexSelector(otherSegment.asQueryableIndex());
-                            Filter joinFilter = Filters.convertDimensionFilters(aJoin.getFilter());
-                            ImmutableConciseSet rhs = joinFilter.goConcise(joinSelector);
-                            List<ImmutableConciseSet> conciseSets = Lists.newArrayList(filterSet, rhs);
-                            ImmutableConciseSet intersects = ImmutableConciseSet.intersection(conciseSets);
-                            filterSet = intersects;
+                            Optional<Segment> joinSegment = finder.findSegment(aJoin.getDataSource(), descriptor);
+                            if (joinSegment.isPresent()) {
+                                Segment otherSegment = joinSegment.get();
+                                BitmapIndexSelector joinSelector = new ColumnSelectorBitmapIndexSelector(otherSegment.asQueryableIndex());
+                                Filter joinFilter = Filters.convertDimensionFilters(aJoin.getFilter());
+                                ImmutableConciseSet rhs = joinFilter.goConcise(joinSelector);
+                                List<ImmutableConciseSet> conciseSets = Lists.newArrayList(filterSet, rhs);
+                                ImmutableConciseSet intersects = ImmutableConciseSet.intersection(conciseSets);
+                                filterSet = intersects;
+                            } else {
+                                throw new ISE("Cannot find join segment, dataSource= " + aJoin.getDataSource() + "descriptor=" + descriptor);
+                            }
                         }
                     }
                 } else {

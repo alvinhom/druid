@@ -3,6 +3,7 @@ package io.druid.query.count;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.google.common.base.Preconditions;
 import io.druid.query.filter.DimFilter;
 
 import java.nio.ByteBuffer;
@@ -26,12 +27,13 @@ public class DefaultJoinSpec implements JoinSpec{
             @JsonProperty("filter") DimFilter filter
     )
     {
+        Preconditions.checkNotNull(dataSource, "dataSource can't be null");
         this.dataSource = dataSource;
         this.filter = filter;
     }
 
     @JsonProperty
-    public String getDatasource() {
+    public String getDataSource() {
         return dataSource;
     }
 
@@ -57,8 +59,8 @@ public class DefaultJoinSpec implements JoinSpec{
     public String toString()
     {
         return "DefaultJoinSpec{" +
-                "dimension='" + dataSource + '\'' +
-                ", filters='" + filter + '\'' +
+                "dataSource='" + dataSource + '\'' +
+                ", filter='" + filter + '\'' +
                 '}';
     }
 }
