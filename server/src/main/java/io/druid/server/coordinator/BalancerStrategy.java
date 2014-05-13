@@ -31,5 +31,7 @@ public interface BalancerStrategy
 
   public BalancerSegmentHolder pickSegmentToMove(final List<ServerHolder> serverHolders);
 
+  public List<BalancerSegmentHolder> pickSegmentsToMove(final List<ServerHolder> serverHolders);
+
   public void emitStats(String tier, CoordinatorStats stats, List<ServerHolder> serverHolderList);
 }

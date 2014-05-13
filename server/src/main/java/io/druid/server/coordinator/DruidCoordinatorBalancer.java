@@ -25,6 +25,7 @@ import com.google.common.collect.MinMaxPriorityQueue;
 import com.metamx.common.guava.Comparators;
 import com.metamx.emitter.EmittingLogger;
 import io.druid.client.DruidServer;
+import io.druid.segment.Segment;
 import io.druid.timeline.DataSegment;
 import org.joda.time.DateTime;
 
@@ -112,16 +113,20 @@ public class DruidCoordinatorBalancer implements DruidCoordinatorHelper
         continue;
       }
 
-      for (int iter = 0; iter < maxSegmentsToMove; iter++) {
-        final BalancerSegmentHolder segmentToMove = strategy.pickSegmentToMove(serverHolderList);
-
-        if (segmentToMove != null && params.getAvailableSegments().contains(segmentToMove.getSegment())) {
-          final ServerHolder holder = strategy.findNewSegmentHomeBalancer(segmentToMove.getSegment(), serverHolderList);
-
-          if (holder != null) {
-            moveSegment(segmentToMove, holder.getServer(), params);
+      int iter = 0;
+      while (iter < maxSegmentsToMove) {
+          final List<BalancerSegmentHolder> segmentsToMove = strategy.pickSegmentsToMove(serverHolderList);
+          if (segmentsToMove.isEmpty()) {
+              iter++;  //prevent infinite loop
+          } else {
+              final ServerHolder holder = strategy.findNewSegmentHomeBalancer(segmentsToMove.get(0).getSegment(), serverHolderList);
+              for (BalancerSegmentHolder segmentToMove: segmentsToMove) {
+                  if (holder != null && !holder.isServingSegment(segmentToMove.getSegment())) {
+                      moveSegment(segmentToMove, holder.getServer(), params);
+                  }
+                  iter++;
+              }
           }
-        }
       }
       stats.addToTieredStat("movedCount", tier, currentlyMovingSegments.get(tier).size());
       if (params.getCoordinatorDynamicConfig().emitBalancingStats()) {

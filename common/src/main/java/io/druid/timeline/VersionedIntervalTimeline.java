@@ -19,6 +19,7 @@
 
 package io.druid.timeline;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.metamx.common.guava.Comparators;
@@ -170,6 +171,28 @@ public class VersionedIntervalTimeline<VersionType, ObjectType>
       lock.readLock().unlock();
     }
   }
+
+    public PartitionHolder<ObjectType> findLastEntry(Interval interval)
+    {
+        try {
+            lock.readLock().lock();
+            for (Map.Entry<Interval, TreeMap<VersionType, TimelineEntry>> entry : allTimelineEntries.entrySet()) {
+                if (entry.getKey().equals(interval) || entry.getKey().contains(interval)) {
+                    TreeMap<VersionType,TimelineEntry> versionMap = entry.getValue();
+                    TimelineEntry foundEntry = entry.getValue().get(versionMap.lastKey());
+                    if (foundEntry != null) {
+                        return new ImmutablePartitionHolder<ObjectType>(
+                                foundEntry.getPartitionHolder()
+                        );
+                    }
+                }
+            }
+            return null;
+        }
+        finally {
+            lock.readLock().unlock();
+        }
+    }
 
   /**
    * Does a lookup for the objects representing the given time interval.  Will *only* return

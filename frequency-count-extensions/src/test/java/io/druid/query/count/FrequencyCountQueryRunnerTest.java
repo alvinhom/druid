@@ -52,8 +52,8 @@ public class FrequencyCountQueryRunnerTest
 
 
         return Arrays.asList(
-                new Object[][]{/*
-                        {
+                new Object[][]{ /*
+                        {  //TODO realtime index does not support asQueryableIndex
                                 makeQueryRunner(factory, rtSegment, new SegmentDescriptor(DATA_INTERVAL, "one", 1))
                         },*/
                         {
@@ -306,6 +306,22 @@ public class FrequencyCountQueryRunnerTest
         TestHelper.assertExpectedResults(expectedResults, results);
     }
 
+
+    @Test
+    public void testJoinOneToManyFilterUseCase1() {
+    // two use cases for 1-many join.
+    // DataSource:  users(id)  events(id)
+    // #1.  Filter events (geo, time, device, ...)  ->  filterevents(id)  -> join with users(id) -> generate groupby count
+    //      select count(*) from events inner join users on (events.id=users.id) where (events.device=x and event.timestamp between y) group by users.categories
+    }
+
+    @Test
+    public void testJoinOneToManyFilterUseCase2() {
+        // two use cases for 1-many join.
+        // DataSource:  users(id)  events(id)
+        // #2.  Filter users (categories in (1..5))  ->  filterusers(id)  -> join with events(id) -> generate distinct count of user by id
+        //      select count(distinct user.id) from users inner join events on (events.id=users.id) where (users.categories in 1..5) group by users.id
+    }
 
     static <K, V> ImmutableMap<K, V> createMapOf(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5, K k6, V v6, K k7, V v7, K k8, V v8, K k9, V v9) {
         return  new ImmutableMap.Builder<K, V>()

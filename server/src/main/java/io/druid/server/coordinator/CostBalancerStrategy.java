@@ -19,6 +19,7 @@
 
 package io.druid.server.coordinator;
 
+import com.google.common.collect.Lists;
 import com.metamx.common.Pair;
 import com.metamx.emitter.EmittingLogger;
 import io.druid.timeline.DataSegment;
@@ -165,6 +166,17 @@ public class CostBalancerStrategy implements BalancerStrategy
   {
     ReservoirSegmentSampler sampler = new ReservoirSegmentSampler();
     return sampler.getRandomBalancerSegmentHolder(serverHolders);
+  }
+
+  @Override
+  public List<BalancerSegmentHolder> pickSegmentsToMove(final List<ServerHolder> serverHolders)
+  {
+    BalancerSegmentHolder segmentToMove = this.pickSegmentToMove(serverHolders);
+    List<BalancerSegmentHolder> segmentList = Lists.newArrayList();
+    if (segmentToMove != null) {
+        segmentList.add(segmentToMove);
+    }
+    return segmentList;
   }
 
   /**

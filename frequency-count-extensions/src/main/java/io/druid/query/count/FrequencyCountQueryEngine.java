@@ -70,9 +70,13 @@ public class FrequencyCountQueryEngine {
                                 BitmapIndexSelector joinSelector = new ColumnSelectorBitmapIndexSelector(otherSegment.asQueryableIndex());
                                 Filter joinFilter = Filters.convertDimensionFilters(aJoin.getFilter());
                                 ImmutableConciseSet rhs = joinFilter.goConcise(joinSelector);
-                                List<ImmutableConciseSet> conciseSets = Lists.newArrayList(filterSet, rhs);
-                                ImmutableConciseSet intersects = ImmutableConciseSet.intersection(conciseSets);
-                                filterSet = intersects;
+                                if (filterSet != null) {
+                                    List<ImmutableConciseSet> conciseSets = Lists.newArrayList(filterSet, rhs);
+                                    ImmutableConciseSet intersects = ImmutableConciseSet.intersection(conciseSets);
+                                    filterSet = intersects;
+                                } else {
+                                    filterSet = rhs;
+                                }
                             } else {
                                 throw new ISE("Cannot find join segment, dataSource= " + aJoin.getDataSource() + "descriptor=" + descriptor);
                             }

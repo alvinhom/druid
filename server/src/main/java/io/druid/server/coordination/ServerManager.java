@@ -378,20 +378,18 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
       final VersionedIntervalTimeline<String, ReferenceCountingSegment> timeline = dataSources.get(dataSource);
 
       if (timeline != null) {
-          final List<TimelineObjectHolder<String, ReferenceCountingSegment>> versionSegments = timeline.lookup(
+          PartitionHolder<ReferenceCountingSegment> entry = timeline.findLastEntry(
                   spec.getInterval()
           );
-          if (versionSegments != null && !versionSegments.isEmpty()) {
-              // get the last version
-              TimelineObjectHolder<String, ReferenceCountingSegment> holder = versionSegments.get(versionSegments.size() - 1);
-              if (holder != null) {
-                  PartitionHolder<ReferenceCountingSegment> entry =  holder.getObject();
-                  final PartitionChunk<ReferenceCountingSegment> chunk = entry.getChunk(spec.getPartitionNumber());
-                  if (chunk != null) {
-                      final Segment adapter = chunk.getObject();
-                      return Optional.of(adapter);
-                  }
+          if (entry != null) {
+              final PartitionChunk<ReferenceCountingSegment> chunk = entry.getChunk(spec.getPartitionNumber());
+              if (chunk != null) {
+                  final Segment adapter = chunk.getObject();
+                  return Optional.of(adapter);
               }
+              final List<TimelineObjectHolder<String, ReferenceCountingSegment>> versionSegments = timeline.lookup(
+                      spec.getInterval()
+              );
           }
       }
       return Optional.absent();

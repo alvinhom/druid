@@ -19,6 +19,7 @@
 
 package io.druid.server.coordinator;
 
+import com.google.common.collect.Lists;
 import io.druid.timeline.DataSegment;
 
 import java.util.List;
@@ -60,6 +61,17 @@ public class RandomBalancerStrategy implements BalancerStrategy
   public BalancerSegmentHolder pickSegmentToMove(List<ServerHolder> serverHolders)
   {
     return sampler.getRandomBalancerSegmentHolder(serverHolders);
+  }
+
+  @Override
+  public List<BalancerSegmentHolder> pickSegmentsToMove(final List<ServerHolder> serverHolders)
+  {
+    BalancerSegmentHolder segmentToMove = this.pickSegmentToMove(serverHolders);
+    List<BalancerSegmentHolder> segmentList = Lists.newArrayList();
+    if (segmentToMove != null) {
+        segmentList.add(segmentToMove);
+    }
+    return segmentList;
   }
 
   @Override
