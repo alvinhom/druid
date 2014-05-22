@@ -21,6 +21,7 @@ package io.druid.segment.realtime;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.io.Closeables;
 import com.google.inject.Inject;
@@ -39,6 +40,8 @@ import io.druid.query.QueryRunnerFactoryConglomerate;
 import io.druid.query.QuerySegmentWalker;
 import io.druid.query.QueryToolChest;
 import io.druid.query.SegmentDescriptor;
+import io.druid.segment.indexing.DataSchema;
+import io.druid.segment.indexing.RealtimeTuningConfig;
 import io.druid.segment.realtime.plumber.Plumber;
 import io.druid.segment.realtime.plumber.Sink;
 import org.joda.time.DateTime;
@@ -77,7 +80,7 @@ public class RealtimeManager implements QuerySegmentWalker
   public void start() throws IOException
   {
     for (final FireDepartment fireDepartment : fireDepartments) {
-      Schema schema = fireDepartment.getSchema();
+      DataSchema schema = fireDepartment.getDataSchema();
 
       final FireChief chief = new FireChief(fireDepartment);
       chiefs.put(schema.getDataSource(), chief);
@@ -96,6 +99,7 @@ public class RealtimeManager implements QuerySegmentWalker
       Closeables.closeQuietly(chief);
     }
   }
+
   public FireDepartmentMetrics getMetrics(String datasource)
   {
     FireChief chief = chiefs.get(datasource);
@@ -108,7 +112,7 @@ public class RealtimeManager implements QuerySegmentWalker
   @Override
   public <T> QueryRunner<T> getQueryRunnerForIntervals(Query<T> query, Iterable<Interval> intervals)
   {
-    final FireChief chief = chiefs.get(query.getDataSource());
+    final FireChief chief = chiefs.get(getDataSourceName(query));
 
     return chief == null ? new NoopQueryRunner<T>() : chief.getQueryRunner(query);
   }
@@ -116,17 +120,23 @@ public class RealtimeManager implements QuerySegmentWalker
   @Override
   public <T> QueryRunner<T> getQueryRunnerForSegments(Query<T> query, Iterable<SegmentDescriptor> specs)
   {
-    final FireChief chief = chiefs.get(query.getDataSource());
+    final FireChief chief = chiefs.get(getDataSourceName(query));
 
     return chief == null ? new NoopQueryRunner<T>() : chief.getQueryRunner(query);
   }
+
+  private <T> String getDataSourceName(Query<T> query)
+  {
+    return Iterables.getOnlyElement(query.getDataSource().getNames());
+  }
+
 
   private class FireChief extends Thread implements Closeable
   {
     private final FireDepartment fireDepartment;
     private final FireDepartmentMetrics metrics;
 
-    private volatile FireDepartmentConfig config = null;
+    private volatile RealtimeTuningConfig config = null;
     private volatile Firehose firehose = null;
     private volatile Plumber plumber = null;
     private volatile boolean normalExit = true;
@@ -142,7 +152,7 @@ public class RealtimeManager implements QuerySegmentWalker
 
     public void init() throws IOException
     {
-      config = fireDepartment.getConfig();
+      config = fireDepartment.getTuningConfig();
 
       synchronized (this) {
         try {
@@ -182,8 +192,8 @@ public class RealtimeManager implements QuerySegmentWalker
               inputRow = firehose.nextRow();
             }
             catch (Exception e) {
-              log.info(e, "thrown away line due to exception");
-              metrics.incrementThrownAway();
+              log.debug(e, "thrown away line due to exception, considering unparseable");
+              metrics.incrementUnparseable();
               continue;
             }
 
@@ -213,13 +223,20 @@ public class RealtimeManager implements QuerySegmentWalker
             continue;
           }
         }
-      } catch (RuntimeException e) {
-        log.makeAlert(e, "RuntimeException aborted realtime processing[%s]", fireDepartment.getSchema().getDataSource())
+      }
+      catch (RuntimeException e) {
+
+        log.makeAlert(
+            e,
+            "RuntimeException aborted realtime processing[%s]",
+            fireDepartment.getDataSchema().getDataSource()
+        )
            .emit();
         normalExit = false;
         throw e;
-      } catch (Error e) {
-        log.makeAlert(e, "Exception aborted realtime processing[%s]", fireDepartment.getSchema().getDataSource())
+      }
+      catch (Error e) {
+        log.makeAlert(e, "Exception aborted realtime processing[%s]", fireDepartment.getDataSchema().getDataSource())
            .emit();
         normalExit = false;
         throw e;
@@ -240,7 +257,7 @@ public class RealtimeManager implements QuerySegmentWalker
       Preconditions.checkNotNull(firehose, "firehose is null, init() must be called first.");
       Preconditions.checkNotNull(plumber, "plumber is null, init() must be called first.");
 
-      log.info("FireChief[%s] state ok.", fireDepartment.getSchema().getDataSource());
+      log.info("FireChief[%s] state ok.", fireDepartment.getDataSchema().getDataSource());
     }
 
     public <T> QueryRunner<T> getQueryRunner(Query<T> query)

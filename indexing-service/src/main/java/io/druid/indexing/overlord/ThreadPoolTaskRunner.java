@@ -22,6 +22,7 @@ package io.druid.indexing.overlord;
 import com.google.api.client.repackaged.com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -38,6 +39,7 @@ import io.druid.indexing.common.TaskToolboxFactory;
 import io.druid.indexing.common.task.Task;
 import io.druid.query.NoopQueryRunner;
 import io.druid.query.Query;
+import io.druid.query.TableDataSource;
 import io.druid.query.QueryRunner;
 import io.druid.query.QuerySegmentWalker;
 import io.druid.query.SegmentDescriptor;
@@ -152,10 +154,11 @@ public class ThreadPoolTaskRunner implements TaskRunner, QuerySegmentWalker
   private <T> QueryRunner<T> getQueryRunnerImpl(Query<T> query)
   {
     QueryRunner<T> queryRunner = null;
+    final String queryDataSource = Iterables.getOnlyElement(query.getDataSource().getNames());
 
     for (final ThreadPoolTaskRunnerWorkItem taskRunnerWorkItem : ImmutableList.copyOf(runningItems)) {
       final Task task = taskRunnerWorkItem.getTask();
-      if (task.getDataSource().equals(query.getDataSource())) {
+      if (task.getDataSource().equals(queryDataSource)) {
         final QueryRunner<T> taskQueryRunner = task.getQueryRunner(query);
 
         if (taskQueryRunner != null) {
@@ -163,7 +166,7 @@ public class ThreadPoolTaskRunner implements TaskRunner, QuerySegmentWalker
             queryRunner = taskQueryRunner;
           } else {
             log.makeAlert("Found too many query runners for datasource")
-               .addData("dataSource", query.getDataSource())
+               .addData("dataSource", queryDataSource)
                .emit();
           }
         }

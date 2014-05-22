@@ -33,6 +33,7 @@ import com.metamx.emitter.service.ServiceMetricEvent;
 import io.druid.collections.OrderedMergeSequence;
 import io.druid.query.BySegmentSkippingQueryRunner;
 import io.druid.query.CacheStrategy;
+import io.druid.query.DataSourceUtil;
 import io.druid.query.Query;
 import io.druid.query.QueryRunner;
 import io.druid.query.QueryToolChest;
@@ -78,7 +79,7 @@ public class TimeBoundaryQueryQueryToolChest
               public boolean apply(T input)
               {
                 return input.getInterval().overlaps(first.getInterval()) || input.getInterval()
-                                                                                 .overlaps(second.getInterval());
+                    .overlaps(second.getInterval());
               }
             }
         )
@@ -117,13 +118,13 @@ public class TimeBoundaryQueryQueryToolChest
   public ServiceMetricEvent.Builder makeMetricBuilder(TimeBoundaryQuery query)
   {
     return new ServiceMetricEvent.Builder()
-        .setUser2(query.getDataSource())
+        .setUser2(DataSourceUtil.getMetricName(query.getDataSource()))
         .setUser4(query.getType())
         .setUser6("false");
   }
 
   @Override
-  public Function<Result<TimeBoundaryResultValue>, Result<TimeBoundaryResultValue>> makeMetricManipulatorFn(
+  public Function<Result<TimeBoundaryResultValue>, Result<TimeBoundaryResultValue>> makePreComputeManipulatorFn(
       TimeBoundaryQuery query, MetricManipulationFn fn
   )
   {
@@ -145,9 +146,9 @@ public class TimeBoundaryQueryQueryToolChest
       public byte[] computeCacheKey(TimeBoundaryQuery query)
       {
         return ByteBuffer.allocate(2)
-                         .put(TIMEBOUNDARY_QUERY)
-                         .put(query.getCacheKey())
-                         .array();
+            .put(TIMEBOUNDARY_QUERY)
+            .put(query.getCacheKey())
+            .array();
       }
 
       @Override

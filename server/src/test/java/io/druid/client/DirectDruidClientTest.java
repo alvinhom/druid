@@ -28,6 +28,7 @@ import com.metamx.http.client.HttpClient;
 import com.metamx.http.client.Request;
 import com.metamx.http.client.RequestBuilder;
 import io.druid.client.selector.ConnectionCountServerSelectorStrategy;
+import io.druid.client.selector.HighestPriorityTierSelectorStrategy;
 import io.druid.client.selector.QueryableDruidServer;
 import io.druid.client.selector.ServerSelector;
 import io.druid.jackson.DefaultObjectMapper;
@@ -87,7 +88,7 @@ public class DirectDruidClientTest
             0,
             0L
         ),
-        new ConnectionCountServerSelectorStrategy()
+        new HighestPriorityTierSelectorStrategy(new ConnectionCountServerSelectorStrategy())
     );
 
     DirectDruidClient client1 = new DirectDruidClient(
@@ -104,12 +105,12 @@ public class DirectDruidClientTest
     );
 
     QueryableDruidServer queryableDruidServer1 = new QueryableDruidServer(
-        null,
+        new DruidServer("test1", "localhost", 0, "historical", DruidServer.DEFAULT_TIER, 0),
         client1
     );
     serverSelector.addServer(queryableDruidServer1);
     QueryableDruidServer queryableDruidServer2 = new QueryableDruidServer(
-        null,
+        new DruidServer("test1", "localhost", 0, "historical", DruidServer.DEFAULT_TIER, 0),
         client2
     );
     serverSelector.addServer(queryableDruidServer2);

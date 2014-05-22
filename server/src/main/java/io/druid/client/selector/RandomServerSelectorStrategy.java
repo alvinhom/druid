@@ -20,6 +20,7 @@
 package io.druid.client.selector;
 
 import com.google.common.collect.Iterators;
+import io.druid.timeline.DataSegment;
 
 import java.util.Random;
 import java.util.Set;
@@ -29,7 +30,7 @@ public class RandomServerSelectorStrategy implements ServerSelectorStrategy
   private static final Random random = new Random();
 
   @Override
-  public QueryableDruidServer pick(Set<QueryableDruidServer> servers)
+  public QueryableDruidServer pick(Set<QueryableDruidServer> servers, DataSegment segment)
   {
     return Iterators.get(servers.iterator(), random.nextInt(servers.size()));
   }

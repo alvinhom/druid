@@ -37,6 +37,7 @@ import com.metamx.emitter.service.ServiceMetricEvent;
 import io.druid.collections.OrderedMergeSequence;
 import io.druid.granularity.QueryGranularity;
 import io.druid.query.CacheStrategy;
+import io.druid.query.DataSourceUtil;
 import io.druid.query.IntervalChunkingQueryRunner;
 import io.druid.query.Query;
 import io.druid.query.QueryCacheHelper;
@@ -46,6 +47,7 @@ import io.druid.query.Result;
 import io.druid.query.ResultGranularTimestampComparator;
 import io.druid.query.ResultMergeQueryRunner;
 import io.druid.query.aggregation.AggregatorFactory;
+import io.druid.query.aggregation.AggregatorUtil;
 import io.druid.query.aggregation.MetricManipulationFn;
 import io.druid.query.aggregation.PostAggregator;
 import io.druid.query.filter.DimFilter;
@@ -53,7 +55,6 @@ import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.joda.time.Minutes;
 
-import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
@@ -64,11 +65,13 @@ import java.util.Map;
 public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultValue>, TopNQuery>
 {
   private static final byte TOPN_QUERY = 0x1;
-
   private static final Joiner COMMA_JOIN = Joiner.on(",");
-  private static final TypeReference<Result<TopNResultValue>> TYPE_REFERENCE = new TypeReference<Result<TopNResultValue>>(){};
-
-  private static final TypeReference<Object> OBJECT_TYPE_REFERENCE = new TypeReference<Object>(){};
+  private static final TypeReference<Result<TopNResultValue>> TYPE_REFERENCE = new TypeReference<Result<TopNResultValue>>()
+  {
+  };
+  private static final TypeReference<Object> OBJECT_TYPE_REFERENCE = new TypeReference<Object>()
+  {
+  };
   private final TopNQueryConfig config;
 
   @Inject
@@ -77,6 +80,14 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
   )
   {
     this.config = config;
+  }
+
+  private static List<PostAggregator> prunePostAggregators(TopNQuery query)
+  {
+    return AggregatorUtil.pruneDependentPostAgg(
+        query.getPostAggregatorSpecs(),
+        query.getTopNMetricSpec().getMetricName(query.getDimensionSpec())
+    );
   }
 
   @Override
@@ -128,7 +139,7 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
     }
 
     return new ServiceMetricEvent.Builder()
-        .setUser2(query.getDataSource())
+        .setUser2(DataSourceUtil.getMetricName(query.getDataSource()))
         .setUser4(String.format("topN/%s/%s", query.getThreshold(), query.getDimensionSpec().getDimension()))
         .setUser5(COMMA_JOIN.join(query.getIntervals()))
         .setUser6(String.valueOf(query.hasFilters()))
@@ -137,7 +148,7 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
   }
 
   @Override
-  public Function<Result<TopNResultValue>, Result<TopNResultValue>> makeMetricManipulatorFn(
+  public Function<Result<TopNResultValue>, Result<TopNResultValue>> makePreComputeManipulatorFn(
       final TopNQuery query, final MetricManipulationFn fn
   )
   {
@@ -146,7 +157,7 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
       private String dimension = query.getDimensionSpec().getOutputName();
 
       @Override
-      public Result<TopNResultValue> apply(@Nullable Result<TopNResultValue> result)
+      public Result<TopNResultValue> apply(Result<TopNResultValue> result)
       {
         List<Map<String, Object>> serializedValues = Lists.newArrayList(
             Iterables.transform(
@@ -154,15 +165,74 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
                 new Function<DimensionAndMetricValueExtractor, Map<String, Object>>()
                 {
                   @Override
-                  public Map<String, Object> apply(@Nullable DimensionAndMetricValueExtractor input)
+                  public Map<String, Object> apply(DimensionAndMetricValueExtractor input)
                   {
                     final Map<String, Object> values = Maps.newHashMap();
                     for (AggregatorFactory agg : query.getAggregatorSpecs()) {
                       values.put(agg.getName(), fn.manipulate(agg, input.getMetric(agg.getName())));
                     }
-                    for (PostAggregator postAgg : query.getPostAggregatorSpecs()) {
-                      values.put(postAgg.getName(), input.getMetric(postAgg.getName()));
+                    for (PostAggregator postAgg : prunePostAggregators(query)) {
+                      Object calculatedPostAgg = input.getMetric(postAgg.getName());
+                      if (calculatedPostAgg != null) {
+                        values.put(postAgg.getName(), calculatedPostAgg);
+                      } else {
+                        values.put(postAgg.getName(), postAgg.compute(values));
+                      }
                     }
+                    values.put(dimension, input.getDimensionValue(dimension));
+
+                    return values;
+                  }
+                }
+            )
+        );
+
+        return new Result<TopNResultValue>(
+            result.getTimestamp(),
+            new TopNResultValue(serializedValues)
+        );
+      }
+    };
+  }
+
+  @Override
+  public Function<Result<TopNResultValue>, Result<TopNResultValue>> makePostComputeManipulatorFn(
+      final TopNQuery query, final MetricManipulationFn fn
+  )
+  {
+    return new Function<Result<TopNResultValue>, Result<TopNResultValue>>()
+    {
+      private String dimension = query.getDimensionSpec().getOutputName();
+
+      @Override
+      public Result<TopNResultValue> apply(Result<TopNResultValue> result)
+      {
+        List<Map<String, Object>> serializedValues = Lists.newArrayList(
+            Iterables.transform(
+                result.getValue(),
+                new Function<DimensionAndMetricValueExtractor, Map<String, Object>>()
+                {
+                  @Override
+                  public Map<String, Object> apply(DimensionAndMetricValueExtractor input)
+                  {
+                    final Map<String, Object> values = Maps.newHashMap();
+                    // put non finalized aggregators for calculating dependent post Aggregators
+                    for (AggregatorFactory agg : query.getAggregatorSpecs()) {
+                      values.put(agg.getName(), input.getMetric(agg.getName()));
+                    }
+
+                    for (PostAggregator postAgg : query.getPostAggregatorSpecs()) {
+                      Object calculatedPostAgg = input.getMetric(postAgg.getName());
+                      if (calculatedPostAgg != null) {
+                        values.put(postAgg.getName(), calculatedPostAgg);
+                      } else {
+                        values.put(postAgg.getName(), postAgg.compute(values));
+                      }
+                    }
+                    for (AggregatorFactory agg : query.getAggregatorSpecs()) {
+                      values.put(agg.getName(), fn.manipulate(agg, input.getMetric(agg.getName())));
+                    }
+
                     values.put(dimension, input.getDimensionValue(dimension));
 
                     return values;
@@ -191,7 +261,11 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
     return new CacheStrategy<Result<TopNResultValue>, Object, TopNQuery>()
     {
       private final List<AggregatorFactory> aggs = query.getAggregatorSpecs();
-      private final List<PostAggregator> postAggs = query.getPostAggregatorSpecs();
+      private final List<PostAggregator> postAggs = AggregatorUtil.pruneDependentPostAgg(
+          query.getPostAggregatorSpecs(),
+          query.getTopNMetricSpec()
+               .getMetricName(query.getDimensionSpec())
+      );
 
       @Override
       public byte[] computeCacheKey(TopNQuery query)
@@ -231,7 +305,7 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
         return new Function<Result<TopNResultValue>, Object>()
         {
           @Override
-          public Object apply(@Nullable final Result<TopNResultValue> input)
+          public Object apply(final Result<TopNResultValue> input)
           {
             List<DimensionAndMetricValueExtractor> results = Lists.newArrayList(input.getValue());
             final List<Object> retVal = Lists.newArrayListWithCapacity(results.size() + 1);
@@ -259,7 +333,7 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
           private final QueryGranularity granularity = query.getGranularity();
 
           @Override
-          public Result<TopNResultValue> apply(@Nullable Object input)
+          public Result<TopNResultValue> apply(Object input)
           {
             List<Object> results = (List<Object>) input;
             List<Map<String, Object>> retVal = Lists.newArrayListWithCapacity(results.size());
@@ -304,13 +378,21 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
   @Override
   public QueryRunner<Result<TopNResultValue>> preMergeQueryDecoration(QueryRunner<Result<TopNResultValue>> runner)
   {
-    return new IntervalChunkingQueryRunner<Result<TopNResultValue>>(runner, config.getChunkPeriod());
+    return new IntervalChunkingQueryRunner<Result<TopNResultValue>>(
+        runner,
+        config.getChunkPeriod()
+    );
   }
 
   @Override
   public QueryRunner<Result<TopNResultValue>> postMergeQueryDecoration(final QueryRunner<Result<TopNResultValue>> runner)
   {
     return new ThresholdAdjustingQueryRunner(runner, config.getMinTopNThreshold());
+  }
+
+  public Ordering<Result<TopNResultValue>> getOrdering()
+  {
+    return Ordering.natural();
   }
 
   private static class ThresholdAdjustingQueryRunner implements QueryRunner<Result<TopNResultValue>>
@@ -339,7 +421,7 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
         return runner.run(query);
       }
 
-      final boolean isBySegment = Boolean.parseBoolean(query.getContextValue("bySegment", "false"));
+      final boolean isBySegment = query.getContextBySegment(false);
 
       return Sequences.map(
           runner.run(query.withThreshold(minTopNThreshold)),
@@ -359,7 +441,7 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
                             new Function<Result<TopNResultValue>, Result<TopNResultValue>>()
                             {
                               @Override
-                              public Result<TopNResultValue> apply(@Nullable Result<TopNResultValue> input)
+                              public Result<TopNResultValue> apply(Result<TopNResultValue> input)
                               {
                                 return new Result<TopNResultValue>(
                                     input.getTimestamp(),
@@ -396,10 +478,5 @@ public class TopNQueryQueryToolChest extends QueryToolChest<Result<TopNResultVal
           }
       );
     }
-  }
-
-  public Ordering<Result<TopNResultValue>> getOrdering()
-  {
-    return Ordering.natural();
   }
 }

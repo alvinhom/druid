@@ -32,13 +32,13 @@ import com.metamx.common.guava.Sequence;
 import com.metamx.common.guava.nary.BinaryFn;
 import com.metamx.emitter.service.ServiceMetricEvent;
 import io.druid.collections.OrderedMergeSequence;
-import io.druid.query.Query;
-import io.druid.query.QueryRunner;
-import io.druid.query.QueryToolChest;
-import io.druid.query.ResultGranularTimestampComparator;
-import io.druid.query.ResultMergeQueryRunner;
-import io.druid.query.Result;
+import io.druid.data.input.MapBasedRow;
+import io.druid.data.input.Row;
+import io.druid.query.*;
+import io.druid.query.aggregation.AggregatorFactory;
 import io.druid.query.aggregation.MetricManipulationFn;
+import io.druid.query.groupby.GroupByQuery;
+import io.druid.query.timeseries.TimeseriesResultValue;
 import org.joda.time.Interval;
 import org.joda.time.Minutes;
 
@@ -142,7 +142,7 @@ public class FrequencyCountQueryQueryToolChest extends QueryToolChest<Result<Fre
     }
 
     return new ServiceMetricEvent.Builder()
-        .setUser2(query.getDataSource())
+        .setUser2(DataSourceUtil.getMetricName(query.getDataSource()))
         .setUser4(query.getType())
         .setUser5(Joiner.on(",").join(query.getIntervals()))
         .setUser6(String.valueOf(query.hasFilters()))
@@ -151,11 +151,17 @@ public class FrequencyCountQueryQueryToolChest extends QueryToolChest<Result<Fre
   }
 
   @Override
-  public Function<Result<FrequencyCountResult>, Result<FrequencyCountResult>> makeMetricManipulatorFn(
-      FrequencyCountQuery query, MetricManipulationFn fn
-  )
+  public Function<Result<FrequencyCountResult>, Result<FrequencyCountResult>> makePreComputeManipulatorFn(final FrequencyCountQuery query, final MetricManipulationFn fn)
   {
-    return Functions.identity();
+    return new Function<Result<FrequencyCountResult>, Result<FrequencyCountResult>>()
+            {
+                @Override
+                public Result<FrequencyCountResult> apply(Result<FrequencyCountResult> input)
+                {
+                    // TODO What does this do?
+                    return input;
+            }
+        };
   }
 
   @Override

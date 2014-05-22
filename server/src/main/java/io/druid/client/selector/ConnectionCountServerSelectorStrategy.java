@@ -20,6 +20,7 @@
 package io.druid.client.selector;
 
 import com.google.common.primitives.Ints;
+import io.druid.timeline.DataSegment;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -37,7 +38,7 @@ public class ConnectionCountServerSelectorStrategy implements ServerSelectorStra
   };
 
   @Override
-  public QueryableDruidServer pick(Set<QueryableDruidServer> servers)
+  public QueryableDruidServer pick(Set<QueryableDruidServer> servers, DataSegment segment)
   {
     return Collections.min(servers, comparator);
   }

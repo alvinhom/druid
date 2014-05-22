@@ -19,9 +19,12 @@
 
 package io.druid.server.coordination;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 import com.google.inject.Inject;
 import com.metamx.common.ISE;
@@ -29,10 +32,28 @@ import com.metamx.common.guava.FunctionalIterable;
 import com.metamx.emitter.EmittingLogger;
 import com.metamx.emitter.service.ServiceEmitter;
 import com.metamx.emitter.service.ServiceMetricEvent;
+import io.druid.client.CachingQueryRunner;
+import io.druid.client.cache.Cache;
+import io.druid.client.cache.CacheConfig;
 import io.druid.collections.CountingMap;
 import io.druid.guice.annotations.Processing;
 import io.druid.query.*;
 import io.druid.query.spec.QuerySegmentSpec;
+import io.druid.guice.annotations.Smile;
+import io.druid.query.BySegmentQueryRunner;
+import io.druid.query.DataSource;
+import io.druid.query.FinalizeResultsQueryRunner;
+import io.druid.query.MetricsEmittingQueryRunner;
+import io.druid.query.NoopQueryRunner;
+import io.druid.query.Query;
+import io.druid.query.QueryRunner;
+import io.druid.query.QueryRunnerFactory;
+import io.druid.query.QueryRunnerFactoryConglomerate;
+import io.druid.query.QuerySegmentWalker;
+import io.druid.query.QueryToolChest;
+import io.druid.query.ReferenceCountingSegmentQueryRunner;
+import io.druid.query.SegmentDescriptor;
+import io.druid.query.TableDataSource;
 import io.druid.query.spec.SpecificSegmentQueryRunner;
 import io.druid.query.spec.SpecificSegmentSpec;
 import io.druid.segment.ReferenceCountingSegment;
@@ -59,24 +80,27 @@ import java.util.concurrent.ExecutorService;
 public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
 {
   private static final EmittingLogger log = new EmittingLogger(ServerManager.class);
-
   private final Object lock = new Object();
-
   private final SegmentLoader segmentLoader;
   private final QueryRunnerFactoryConglomerate conglomerate;
   private final ServiceEmitter emitter;
   private final ExecutorService exec;
-
   private final Map<String, VersionedIntervalTimeline<String, ReferenceCountingSegment>> dataSources;
   private final CountingMap<String> dataSourceSizes = new CountingMap<String>();
   private final CountingMap<String> dataSourceCounts = new CountingMap<String>();
+  private final Cache cache;
+  private final ObjectMapper objectMapper;
+  private final CacheConfig cacheConfig;
 
   @Inject
   public ServerManager(
       SegmentLoader segmentLoader,
       QueryRunnerFactoryConglomerate conglomerate,
       ServiceEmitter emitter,
-      @Processing ExecutorService exec
+      @Processing ExecutorService exec,
+      @Smile ObjectMapper objectMapper,
+      Cache cache,
+      CacheConfig cacheConfig
   )
   {
     this.segmentLoader = segmentLoader;
@@ -84,8 +108,11 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
     this.emitter = emitter;
 
     this.exec = exec;
+    this.cache = cache;
+    this.objectMapper = objectMapper;
 
     this.dataSources = new HashMap<>();
+    this.cacheConfig = cacheConfig;
   }
 
   public Map<String, Long> getDataSourceSizes()
@@ -109,8 +136,11 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
 
   /**
    * Load a single segment.
+   *
    * @param segment segment to load
+   *
    * @return true if the segment was newly loaded, false if it was already loaded
+   *
    * @throws SegmentLoadingException if the segment cannot be loaded
    */
   public boolean loadSegment(final DataSegment segment) throws SegmentLoadingException
@@ -227,7 +257,13 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
 
     final QueryToolChest<T, Query<T>> toolChest = factory.getToolchest();
 
-    final VersionedIntervalTimeline<String, ReferenceCountingSegment> timeline = dataSources.get(query.getDataSource());
+    DataSource dataSource = query.getDataSource();
+    if (!(dataSource instanceof TableDataSource)) {
+      throw new UnsupportedOperationException("data source type '" + dataSource.getClass().getName() + "' unsupported");
+    }
+    String dataSourceName = getDataSourceName(dataSource);
+
+    final VersionedIntervalTimeline<String, ReferenceCountingSegment> timeline = dataSources.get(dataSourceName);
 
     if (timeline == null) {
       return new NoopQueryRunner<T>();
@@ -269,13 +305,12 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
                                 factory,
                                 toolChest,
                                 input.getObject(),
-                                new SpecificSegmentSpec(
-                                    new SegmentDescriptor(
-                                        holder.getInterval(),
-                                        holder.getVersion(),
-                                        input.getChunkNumber()
-                                    )
+                                new SegmentDescriptor(
+                                    holder.getInterval(),
+                                    holder.getVersion(),
+                                    input.getChunkNumber()
                                 )
+
                             );
                           }
                         }
@@ -288,7 +323,13 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
             Predicates.<QueryRunner<T>>notNull()
         );
 
+
     return new FinalizeResultsQueryRunner<T>(toolChest.mergeResults(factory.mergeRunners(exec, adapters)), toolChest);
+  }
+
+  private String getDataSourceName(DataSource dataSource)
+  {
+    return Iterables.getOnlyElement(dataSource.getNames());
   }
 
   @Override
@@ -304,7 +345,9 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
 
     final QueryToolChest<T, Query<T>> toolChest = factory.getToolchest();
 
-    final VersionedIntervalTimeline<String, ReferenceCountingSegment> timeline = dataSources.get(query.getDataSource());
+    String dataSourceName = getDataSourceName(query.getDataSource());
+
+    final VersionedIntervalTimeline<String, ReferenceCountingSegment> timeline = dataSources.get(dataSourceName);
 
     if (timeline == null) {
       return new NoopQueryRunner<T>();
@@ -334,7 +377,7 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
 
                 final ReferenceCountingSegment adapter = chunk.getObject();
                 return Arrays.asList(
-                    buildAndDecorateQueryRunner(factory, toolChest, adapter, new SpecificSegmentSpec(input))
+                    buildAndDecorateQueryRunner(factory, toolChest, adapter, input)
                 );
               }
             }
@@ -350,9 +393,10 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
       final QueryRunnerFactory<T, Query<T>> factory,
       final QueryToolChest<T, Query<T>> toolChest,
       final ReferenceCountingSegment adapter,
-      final QuerySegmentSpec segmentSpec
+      final SegmentDescriptor segmentDescriptor
   )
   {
+    SpecificSegmentSpec segmentSpec = new SpecificSegmentSpec(segmentDescriptor);
     return new SpecificSegmentQueryRunner<T>(
         new MetricsEmittingQueryRunner<T>(
             emitter,
@@ -367,7 +411,15 @@ public class ServerManager implements QuerySegmentWalker, QuerySegmentFinder
             new BySegmentQueryRunner<T>(
                 adapter.getIdentifier(),
                 adapter.getDataInterval().getStart(),
-                new ReferenceCountingSegmentQueryRunner<T>(factory, adapter)
+                new CachingQueryRunner<T>(
+                    adapter.getIdentifier(),
+                    segmentDescriptor,
+                    objectMapper,
+                    cache,
+                    toolChest,
+                    new ReferenceCountingSegmentQueryRunner<T>(factory, adapter),
+                    cacheConfig
+                )
             )
         ).withWaitMeasuredFromNow(),
         segmentSpec

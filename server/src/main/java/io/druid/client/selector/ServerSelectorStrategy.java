@@ -21,6 +21,7 @@ package io.druid.client.selector;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import io.druid.timeline.DataSegment;
 
 import java.util.Set;
 
@@ -31,5 +32,5 @@ import java.util.Set;
 })
 public interface ServerSelectorStrategy
 {
-  public QueryableDruidServer pick(Set<QueryableDruidServer> servers);
+  public QueryableDruidServer pick(Set<QueryableDruidServer> servers, DataSegment segment);
 }

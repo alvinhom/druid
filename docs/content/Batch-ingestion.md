@@ -54,10 +54,8 @@ The interval is the [ISO8601 interval](http://en.wikipedia.org/wiki/ISO_8601#Tim
     "gran": "day"
   },
   "pathSpec": {
-    "type": "granularity",
-    "dataGranularity": "hour",
-    "inputPath": "s3n:\/\/billy-bucket\/the\/data\/is\/here",
-    "filePattern": ".*"
+    "type": "static",
+    "paths" : "example/path/data.gz,example/path/moredata.gz"
   },
   "rollupSpec": {
     "aggs": [
@@ -82,9 +80,10 @@ The interval is the [ISO8601 interval](http://en.wikipedia.org/wiki/ISO_8601#Tim
   "segmentOutputPath": "s3n:\/\/billy-bucket\/the\/segments\/go\/here",
   "leaveIntermediate": "false",
   "partitionsSpec": {
+    "type": "hashed"
     "targetPartitionSize": 5000000
   },
-  "updaterJobSpec": {
+  "metadataUpdateSpec": {
     "type": "db",
     "connectURI": "jdbc:mysql:\/\/localhost:7980\/test_db",
     "user": "username",
@@ -109,11 +108,25 @@ The interval is the [ISO8601 interval](http://en.wikipedia.org/wiki/ISO_8601#Tim
 |segmentOutputPath|the path to dump segments into.|yes|
 |leaveIntermediate|leave behind files in the workingPath when job completes or fails (debugging tool).|no|
 |partitionsSpec|a specification of how to partition each time bucket into segments, absence of this property means no partitioning will occur.|no|
-|updaterJobSpec|a specification of how to update the metadata for the druid cluster these segments belong to.|yes|
+|metadataUpdateSpec|a specification of how to update the metadata for the druid cluster these segments belong to.|yes|
 
 ### Path specification
 
 There are multiple types of path specification:
+
+##### `static`
+
+Is a type of data loader where a static path to where the data files are located is passed.
+
+|property|description|required?|
+|--------|-----------|---------|
+|paths|A String of input paths indicating where the raw data is located.|yes|
+
+For example, using the static input paths:
+
+```
+"paths" : "s3n://billy-bucket/the/data/is/here/data.gz, s3n://billy-bucket/the/data/is/here/moredata.gz, s3n://billy-bucket/the/data/is/here/evenmoredata.gz"
+```
 
 ##### `granularity`
 
@@ -145,15 +158,37 @@ The indexing process has the ability to roll data up as it processes the incomin
 
 ### Partitioning specification
 
-Segments are always partitioned based on timestamp (according to the granularitySpec) and may be further partitioned in some other way. For example, data for a day may be split by the dimension "last\_name" into two segments: one with all values from A-M and one with all values from N-Z.
+Segments are always partitioned based on timestamp (according to the granularitySpec) and may be further partitioned in some other way depending on partition type.
+Druid supports two types of partitions spec - singleDimension and hashed.
 
-To use this option, the indexer must be given a target partition size. It can then find a good set of partition ranges on its own.
+In SingleDimension partition type data is partitioned based on the values in that dimension.
+For example, data for a day may be split by the dimension "last\_name" into two segments: one with all values from A-M and one with all values from N-Z.
+
+In hashed partition type, the number of partitions is determined based on the targetPartitionSize and cardinality of input set and the data is partitioned based on the hashcode of the row.
+
+It is recommended to use Hashed partition as it is more efficient than singleDimension since it does not need to determine the dimension for creating partitions.
+Hashing also gives better distribution of data resulting in equal sized partitions and improving query performance
+
+To use this druid to automatically determine optimal partitions indexer must be given a target partition size. It can then find a good set of partition ranges on its own.
+
+#### Configuration for disabling auto-sharding and creating Fixed number of partitions
+ Druid can be configured to NOT run determine partitions and create a fixed number of shards by specifying numShards in hashed partitionsSpec.
+ e.g This configuration will skip determining optimal partitions and always create 4 shards for every segment granular interval
+
+```json
+  "partitionsSpec": {
+     "type": "hashed"
+     "numShards": 4
+   }
+```
 
 |property|description|required?|
 |--------|-----------|---------|
+|type|type of partitionSpec to be used |no, default : singleDimension|
 |targetPartitionSize|target number of rows to include in a partition, should be a number that targets segments of 700MB\~1GB.|yes|
 |partitionDimension|the dimension to partition on. Leave blank to select a dimension automatically.|no|
 |assumeGrouped|assume input data has already been grouped on time and dimensions. This is faster, but can choose suboptimal partitions if the assumption is violated.|no|
+|numShards|provides a way to manually override druid-auto sharding and specify the number of shards to create for each segment granular interval.It is only supported by hashed partitionSpec and targetPartitionSize must be set to -1|no|
 
 ### Updater job spec
 
@@ -204,7 +239,7 @@ The schema of the Hadoop Index Task contains a task "type" and a Hadoop Index Co
       "type" : "static",
       "paths" : "data.json"
     },
-    "targetPartitionSi:qze" : 5000000,
+    "targetPartitionSize" : 5000000,
     "rollupSpec" : {
       "aggs": [{
           "type" : "count",
@@ -233,7 +268,7 @@ The schema of the Hadoop Index Task contains a task "type" and a Hadoop Index Co
 |config|A Hadoop Index Config (see above).|yes|
 |hadoopCoordinates|The Maven `<groupId>:<artifactId>:<version>` of Hadoop to use. The default is "org.apache.hadoop:hadoop-core:1.0.3".|no|
 
-The Hadoop Index Config submitted as part of an Hadoop Index Task is identical to the Hadoop Index Config used by the `HadoopBatchIndexer` except that three fields must be omitted: `segmentOutputPath`, `workingPath`, `updaterJobSpec`. The Indexing Service takes care of setting these fields internally.
+The Hadoop Index Config submitted as part of an Hadoop Index Task is identical to the Hadoop Index Config used by the `HadoopBatchIndexer` except that three fields must be omitted: `segmentOutputPath`, `workingPath`, `metadataUpdateSpec`. The Indexing Service takes care of setting these fields internally.
 
 To run the task:
 

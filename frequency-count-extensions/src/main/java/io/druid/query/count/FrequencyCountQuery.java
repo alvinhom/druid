@@ -23,7 +23,10 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 
+import io.druid.data.input.Row;
 import io.druid.query.BaseQuery;
+import io.druid.query.DataSource;
+import io.druid.query.Query;
 import io.druid.query.Result;
 import io.druid.query.filter.DimFilter;
 import io.druid.query.search.search.SearchQuerySpec;
@@ -47,13 +50,13 @@ public class FrequencyCountQuery extends BaseQuery<Result<FrequencyCountResult>>
 
   @JsonCreator
   public FrequencyCountQuery(
-          @JsonProperty("dataSource") String dataSource,
+          @JsonProperty("dataSource") DataSource dataSource,
           @JsonProperty("intervals") QuerySegmentSpec querySegmentSpec,
           @JsonProperty("filter") DimFilter dimFilter,
           @JsonProperty("dimensions") List<String> dimensions,
           @JsonProperty("query") SearchQuerySpec query,
           @JsonProperty("join") List<JoinSpec> join,
-          @JsonProperty("context") Map<String, String> context
+          @JsonProperty("context") Map<String, Object> context
   )
   {
     super(dataSource, querySegmentSpec, context);
@@ -113,7 +116,7 @@ public class FrequencyCountQuery extends BaseQuery<Result<FrequencyCountResult>>
     );
   }
 
-  public FrequencyCountQuery withOverriddenContext(Map<String, String> contextOverrides)
+  public FrequencyCountQuery withOverriddenContext(Map<String, Object> contextOverrides)
   {
     return new FrequencyCountQuery(
         getDataSource(),
@@ -124,6 +127,20 @@ public class FrequencyCountQuery extends BaseQuery<Result<FrequencyCountResult>>
         join,
         computeOverridenContext(contextOverrides)
     );
+  }
+
+  @Override
+  public BaseQuery<Result<FrequencyCountResult>> withDataSource(DataSource dataSource)
+  {
+        return new FrequencyCountQuery(
+                dataSource,
+                getQuerySegmentSpec(),
+                dimFilter,
+                dimensions,
+                query,
+                join,
+                getContext()
+        );
   }
   
   @Override

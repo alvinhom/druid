@@ -35,6 +35,7 @@ import java.util.List;
 @JsonSubTypes(value = {
     @JsonSubTypes.Type(name = "numeric", value = NumericTopNMetricSpec.class),
     @JsonSubTypes.Type(name = "lexicographic", value = LexicographicTopNMetricSpec.class),
+    @JsonSubTypes.Type(name = "alphaNumeric", value = AlphaNumericTopNMetricSpec.class),
     @JsonSubTypes.Type(name = "inverted", value = InvertedTopNMetricSpec.class)
 })
 public interface TopNMetricSpec
@@ -47,7 +48,9 @@ public interface TopNMetricSpec
       DateTime timestamp,
       DimensionSpec dimSpec,
       int threshold,
-      Comparator comparator
+      Comparator comparator,
+      List<AggregatorFactory> aggFactories,
+      List<PostAggregator> postAggs
   );
 
   public byte[] getCacheKey();
@@ -55,4 +58,6 @@ public interface TopNMetricSpec
   public <T> TopNMetricSpecBuilder<T> configureOptimizer(TopNMetricSpecBuilder<T> builder);
 
   public void initTopNAlgorithmSelector(TopNAlgorithmSelector selector);
+
+  public String getMetricName(DimensionSpec dimSpec);
 }

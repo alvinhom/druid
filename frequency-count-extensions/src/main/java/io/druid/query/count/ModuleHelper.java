@@ -2,6 +2,8 @@ package io.druid.query.count;
 
 import com.google.common.collect.Lists;
 
+import io.druid.query.DataSource;
+import io.druid.query.TableDataSource;
 import io.druid.query.filter.DimFilter;
 import io.druid.query.filter.OrDimFilter;
 import io.druid.query.filter.SelectorDimFilter;
@@ -43,16 +45,15 @@ public class ModuleHelper {
      */
     public static class FrequencyCountQueryBuilder
     {
-        private String dataSource;
+        private DataSource dataSource;
         private QuerySegmentSpec querySegmentSpec;
         private DimFilter dimFilter;
         private List<String> dimensions;
-        private Map<String, String> context;
+        private Map<String, Object> context;
         private SearchQuerySpec searchQuerySpec;
         private List<JoinSpec> join;
         private FrequencyCountQueryBuilder()
         {
-            dataSource = "";
             join = Lists.newArrayList();
             querySegmentSpec = null;
             dimFilter = null;
@@ -93,7 +94,7 @@ public class ModuleHelper {
                     .context(builder.context);
         }
 
-        public String getDataSource()
+        public DataSource getDataSource()
         {
             return dataSource;
         }
@@ -119,14 +120,20 @@ public class ModuleHelper {
         }
 
 
-        public Map<String, String> getContext()
+        public Map<String, Object> getContext()
         {
             return context;
         }
 
         public FrequencyCountQueryBuilder dataSource(String ds)
         {
-            dataSource = ds;
+            dataSource =  new TableDataSource(ds);
+            return this;
+        }
+
+        public FrequencyCountQueryBuilder dataSource(DataSource ds)
+        {
+            dataSource =  ds;
             return this;
         }
 
@@ -206,7 +213,7 @@ public class ModuleHelper {
         }
 
 
-        public FrequencyCountQueryBuilder context(Map<String, String> c)
+        public FrequencyCountQueryBuilder context(Map<String, Object> c)
         {
             context = c;
             return this;

@@ -45,7 +45,7 @@ import io.druid.indexing.common.actions.LocalTaskActionClientFactory;
 import io.druid.indexing.common.actions.TaskActionClientFactory;
 import io.druid.indexing.common.actions.TaskActionToolbox;
 import io.druid.indexing.common.config.TaskStorageConfig;
-import io.druid.indexing.common.index.ChatHandlerProvider;
+import io.druid.segment.realtime.firehose.ChatHandlerProvider;
 import io.druid.indexing.common.tasklogs.SwitchingTaskLogStreamer;
 import io.druid.indexing.common.tasklogs.TaskRunnerTaskLogStreamer;
 import io.druid.indexing.overlord.DbTaskStorage;
@@ -93,7 +93,7 @@ import java.util.List;
  */
 @Command(
     name = "overlord",
-    description = "Runs an Overlord node, see http://druid.io/docs/0.6.48/Indexing-Service.html for a description"
+    description = "Runs an Overlord node, see http://druid.io/docs/latest/Indexing-Service.html for a description"
 )
 public class CliOverlord extends ServerRunnable
 {

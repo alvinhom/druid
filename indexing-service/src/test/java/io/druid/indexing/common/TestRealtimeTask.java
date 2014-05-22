@@ -47,10 +47,12 @@ public class TestRealtimeTask extends RealtimeIndexTask
     super(
         id,
         taskResource,
+        null,
         new Schema(dataSource, null, new AggregatorFactory[]{}, QueryGranularity.NONE, new NoneShardSpec()),
         null,
         null,
         null,
+        1,
         null,
         null
     );

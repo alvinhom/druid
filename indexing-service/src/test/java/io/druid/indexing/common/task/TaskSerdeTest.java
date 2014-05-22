@@ -28,14 +28,13 @@ import io.druid.data.input.impl.JSONDataSpec;
 import io.druid.data.input.impl.TimestampSpec;
 import io.druid.granularity.QueryGranularity;
 import io.druid.guice.FirehoseModule;
-import io.druid.indexer.HadoopDruidIndexerSchema;
-import io.druid.indexer.granularity.UniformGranularitySpec;
+import io.druid.indexer.HadoopIngestionSpec;
 import io.druid.indexer.rollup.DataRollupSpec;
 import io.druid.jackson.DefaultObjectMapper;
 import io.druid.query.aggregation.AggregatorFactory;
 import io.druid.query.aggregation.CountAggregatorFactory;
 import io.druid.query.aggregation.DoubleSumAggregatorFactory;
-import io.druid.segment.IndexGranularity;
+import io.druid.segment.indexing.granularity.UniformGranularitySpec;
 import io.druid.segment.realtime.Schema;
 import io.druid.segment.realtime.firehose.LocalFirehoseFactory;
 import io.druid.timeline.DataSegment;
@@ -54,9 +53,14 @@ public class TaskSerdeTest
   {
     final IndexTask task = new IndexTask(
         null,
-        "foo",
-        new UniformGranularitySpec(Granularity.DAY, ImmutableList.of(new Interval("2010-01-01/P2D"))),
         null,
+        "foo",
+        new UniformGranularitySpec(
+            Granularity.DAY,
+            null,
+            ImmutableList.of(new Interval("2010-01-01/P2D")),
+            Granularity.DAY
+        ),
         new AggregatorFactory[]{new DoubleSumAggregatorFactory("met", "met")},
         QueryGranularity.NONE,
         10000,
@@ -80,8 +84,8 @@ public class TaskSerdeTest
     Assert.assertEquals(task.getGroupId(), task2.getGroupId());
     Assert.assertEquals(task.getDataSource(), task2.getDataSource());
     Assert.assertEquals(task.getInterval(), task2.getInterval());
-    Assert.assertTrue(task.getFirehoseFactory() instanceof LocalFirehoseFactory);
-    Assert.assertTrue(task2.getFirehoseFactory() instanceof LocalFirehoseFactory);
+    Assert.assertTrue(task.getIngestionSchema().getIOConfig().getFirehoseFactory() instanceof LocalFirehoseFactory);
+    Assert.assertTrue(task2.getIngestionSchema().getIOConfig().getFirehoseFactory() instanceof LocalFirehoseFactory);
   }
 
   @Test
@@ -194,11 +198,13 @@ public class TaskSerdeTest
     final RealtimeIndexTask task = new RealtimeIndexTask(
         null,
         new TaskResource("rofl", 2),
+        null,
         new Schema("foo", null, new AggregatorFactory[0], QueryGranularity.NONE, new NoneShardSpec()),
         null,
         null,
         new Period("PT10M"),
-        IndexGranularity.HOUR,
+        1,
+        Granularity.HOUR,
         null
     );
 
@@ -211,16 +217,29 @@ public class TaskSerdeTest
     Assert.assertEquals("foo", task.getDataSource());
     Assert.assertEquals(2, task.getTaskResource().getRequiredCapacity());
     Assert.assertEquals("rofl", task.getTaskResource().getAvailabilityGroup());
-    Assert.assertEquals(new Period("PT10M"), task.getWindowPeriod());
-    Assert.assertEquals(IndexGranularity.HOUR, task.getSegmentGranularity());
+    Assert.assertEquals(
+        new Period("PT10M"),
+        task.getRealtimeIngestionSchema()
+            .getTuningConfig().getWindowPeriod()
+    );
+    Assert.assertEquals(
+        Granularity.HOUR,
+        task.getRealtimeIngestionSchema().getDataSchema().getGranularitySpec().getSegmentGranularity()
+    );
 
     Assert.assertEquals(task.getId(), task2.getId());
     Assert.assertEquals(task.getGroupId(), task2.getGroupId());
     Assert.assertEquals(task.getDataSource(), task2.getDataSource());
     Assert.assertEquals(task.getTaskResource().getRequiredCapacity(), task2.getTaskResource().getRequiredCapacity());
     Assert.assertEquals(task.getTaskResource().getAvailabilityGroup(), task2.getTaskResource().getAvailabilityGroup());
-    Assert.assertEquals(task.getWindowPeriod(), task2.getWindowPeriod());
-    Assert.assertEquals(task.getSegmentGranularity(), task2.getSegmentGranularity());
+    Assert.assertEquals(
+        task.getRealtimeIngestionSchema().getTuningConfig().getWindowPeriod(),
+        task2.getRealtimeIngestionSchema().getTuningConfig().getWindowPeriod()
+    );
+    Assert.assertEquals(
+        task.getRealtimeIngestionSchema().getDataSchema().getGranularitySpec().getSegmentGranularity(),
+        task2.getRealtimeIngestionSchema().getDataSchema().getGranularitySpec().getSegmentGranularity()
+    );
   }
 
   @Test
@@ -321,6 +340,31 @@ public class TaskSerdeTest
     Assert.assertEquals(task.getInterval(), task2.getInterval());
   }
 
+
+  @Test
+  public void testRestoreTaskSerde() throws Exception
+  {
+    final RestoreTask task = new RestoreTask(
+        null,
+        "foo",
+        new Interval("2010-01-01/P1D")
+    );
+
+    final ObjectMapper jsonMapper = new DefaultObjectMapper();
+    final String json = jsonMapper.writeValueAsString(task);
+
+    Thread.sleep(100); // Just want to run the clock a bit to make sure the task id doesn't change
+    final RestoreTask task2 = (RestoreTask) jsonMapper.readValue(json, Task.class);
+
+    Assert.assertEquals("foo", task.getDataSource());
+    Assert.assertEquals(new Interval("2010-01-01/P1D"), task.getInterval());
+
+    Assert.assertEquals(task.getId(), task2.getId());
+    Assert.assertEquals(task.getGroupId(), task2.getGroupId());
+    Assert.assertEquals(task.getDataSource(), task2.getDataSource());
+    Assert.assertEquals(task.getInterval(), task2.getInterval());
+  }
+
   @Test
   public void testMoveTaskSerde() throws Exception
   {
@@ -353,11 +397,18 @@ public class TaskSerdeTest
   {
     final HadoopIndexTask task = new HadoopIndexTask(
         null,
-        new HadoopDruidIndexerSchema(
+        null,
+        new HadoopIngestionSpec(
+            null, null, null,
             "foo",
             new TimestampSpec("timestamp", "auto"),
             new JSONDataSpec(ImmutableList.of("foo"), null),
-            new UniformGranularitySpec(Granularity.DAY, ImmutableList.of(new Interval("2010-01-01/P1D"))),
+            new UniformGranularitySpec(
+                Granularity.DAY,
+                null,
+                ImmutableList.of(new Interval("2010-01-01/P1D")),
+                Granularity.DAY
+            ),
             ImmutableMap.<String, Object>of("paths", "bar"),
             null,
             null,
@@ -370,9 +421,15 @@ public class TaskSerdeTest
             new DataRollupSpec(ImmutableList.<AggregatorFactory>of(), QueryGranularity.NONE),
             null,
             false,
+            ImmutableMap.of("foo", "bar"),
+            null,
+            null,
+            null,
+            null,
             null,
             null
         ),
+        null,
         null
     );
 
@@ -381,11 +438,13 @@ public class TaskSerdeTest
     final HadoopIndexTask task2 = (HadoopIndexTask) jsonMapper.readValue(json, Task.class);
 
     Assert.assertEquals("foo", task.getDataSource());
-    Assert.assertEquals(new Interval("2010-01-01/P1D"), task.getInterval());
 
     Assert.assertEquals(task.getId(), task2.getId());
     Assert.assertEquals(task.getGroupId(), task2.getGroupId());
     Assert.assertEquals(task.getDataSource(), task2.getDataSource());
-    Assert.assertEquals(task.getInterval(), task2.getInterval());
+    Assert.assertEquals(
+        task.getSpec().getTuningConfig().getJobProperties(),
+        task2.getSpec().getTuningConfig().getJobProperties()
+    );
   }
 }

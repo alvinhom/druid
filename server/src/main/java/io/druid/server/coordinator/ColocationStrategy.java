@@ -20,7 +20,8 @@ public class ColocationStrategy implements BalancerStrategy {
     public ColocationStrategy(DateTime referenceDateTime) {
         // populate map from config
         collocateMap.put("ibe240", "ap240");
-        this.next = new CostBalancerStrategyFactory().createBalancerStrategy(referenceDateTime);
+        //this.next=null;
+        this.next = new CostBalancerStrategyFactory(1).createBalancerStrategy(referenceDateTime);
     }
 
     @Override

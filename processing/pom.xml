@@ -28,7 +28,7 @@
     <parent>
         <groupId>io.druid</groupId>
         <artifactId>druid</artifactId>
-        <version>0.6.49-SNAPSHOT</version>
+        <version>0.6.109-SNAPSHOT</version>
     </parent>
 
     <dependencies>
@@ -78,6 +78,10 @@
             <artifactId>rhino</artifactId>
             <version>1.7R4</version>
         </dependency>
+        <dependency>
+            <groupId>com.davekoelle</groupId>
+            <artifactId>alphanum</artifactId>
+        </dependency>
 
 
         <!-- Tests -->
@@ -91,6 +95,10 @@
             <artifactId>easymock</artifactId>
             <scope>test</scope>
         </dependency>
+      <dependency>
+        <groupId>com.google.caliper</groupId>
+        <artifactId>caliper</artifactId>
+      </dependency>
     </dependencies>
 
     <build>

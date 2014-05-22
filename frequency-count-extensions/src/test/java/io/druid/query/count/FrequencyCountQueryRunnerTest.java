@@ -40,7 +40,7 @@ public class FrequencyCountQueryRunnerTest
     private static final IncrementalIndex rtIndex = TestIndex.getIncrementalTestIndex();
     private static final QueryableIndex mMappedTestIndex = TestIndex.getMMappedTestIndex();
     private static final QueryableIndex mergedRealtimeIndex = TestIndex.mergedRealtimeIndex();
-    private static final Segment rtSegment = new IncrementalIndexSegment(rtIndex);
+    //private static final Segment rtSegment = new IncrementalIndexSegment(rtIndex);
     private static final Segment mMappedSegment =  new QueryableIndexSegment(null, mMappedTestIndex);
     private static final Segment mergedSegment = new QueryableIndexSegment(null, mergedRealtimeIndex);
 
@@ -86,9 +86,11 @@ public class FrequencyCountQueryRunnerTest
         testFinder = new QuerySegmentFinder() {
             @Override
             public Optional<Segment> findSegment(String dataSource, SegmentDescriptor spec) {
-                if (spec.getPartitionNumber() == 1) {
+                /*TODO if (spec.getPartitionNumber() == 1) {
                     return Optional.of(rtSegment);
-                } else if (spec.getPartitionNumber() == 2) {
+                }*/
+
+                if (spec.getPartitionNumber() == 2) {
                     return Optional.of(mMappedSegment);
                 } else {
                     return Optional.of(mergedSegment);
